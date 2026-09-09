@@ -1,0 +1,936 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>frog pond</title>
+  <style>
+    * { margin: 0; padding: 0; }
+    body { overflow: hidden; background: #07070f; }
+    canvas { display: block; }
+  </style>
+</head>
+<body>
+<script type="module">
+import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.module.js";
+
+// ═══════════════════════════════════════════════
+//  CONSTANTS
+// ═══════════════════════════════════════════════
+const LOG_R = 1.0;
+const LOG_HALF = 3.5;
+const LOG_CY = 0.8;          // log cylinder center y
+const LOG_TOP = LOG_CY + LOG_R; // 1.8
+const FROG_REST_Y = 2.6;     // frog group y when sitting on log
+const WATER_Y = 0.0;
+const SWIM_Y = 0.15;         // frog y when swimming (head peeks out)
+const TONGUE_LEN = 2.5;
+const CATCH_RANGE = 5.0;
+
+// ═══════════════════════════════════════════════
+//  PALETTE — bold, saturated, cartoon
+// ═══════════════════════════════════════════════
+const C = {
+  bg: 0x0b0b1e,
+  water: 0x00e5ff,
+  waterDeep: 0x0060a0,
+  frog: 0x00ff66,
+  frogDark: 0x00b347,
+  belly: 0xaaffcc,
+  eye: 0xffff00,
+  pupil: 0x111111,
+  tongue: 0xff3366,
+  sun: 0xffcc00,
+  sunGlow: 0xff9900,
+  log: 0x6d4c41,
+  logDark: 0x4e342e,
+  logRing: 0x3e2723,
+  grass: 0x00e676,
+  lily: 0x1de9b6,
+  flower: 0xff4081,
+  flowerC: 0xffee58,
+  fly: 0xffeb3b,
+  wing: 0xffffff,
+  firefly: 0x76ff03,
+  fireflyG: 0x76ff03,
+  moth: 0xbcaaa4,
+  mothW: 0xd7ccc8,
+  bfly: 0xff5722,
+  ripple: 0x84ffff,
+  cloud: 0x2a2a5a,
+  mouth: 0x1a1a2e,
+};
+
+// ═══════════════════════════════════════════════
+//  SCENE / CAMERA / RENDERER
+// ═══════════════════════════════════════════════
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(C.bg);
+scene.fog = new THREE.Fog(C.bg, 45, 110);
+
+const cam = new THREE.PerspectiveCamera(48, innerWidth / innerHeight, 0.1, 200);
+cam.position.set(0, 6, 24);
+cam.lookAt(0, 2.5, 0);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(devicePixelRatio);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+document.body.appendChild(renderer.domElement);
+
+// ═══════════════════════════════════════════════
+//  LIGHTS
+// ═══════════════════════════════════════════════
+scene.add(new THREE.AmbientLight(0x334466, 1.2));
+
+const key = new THREE.DirectionalLight(C.sun, 1.8);
+key.position.set(15, 25, 10);
+key.castShadow = true;
+key.shadow.mapSize.set(2048, 2048);
+key.shadow.camera.left = -30;
+key.shadow.camera.right = 30;
+key.shadow.camera.top = 30;
+key.shadow.camera.bottom = -30;
+key.shadow.camera.far = 80;
+scene.add(key);
+
+const fill = new THREE.DirectionalLight(C.water, 0.4);
+fill.position.set(-8, 4, -6);
+scene.add(fill);
+
+// ═══════════════════════════════════════════════
+//  MATERIALS
+// ═══════════════════════════════════════════════
+const M = {
+  frog:    new THREE.MeshStandardMaterial({ color: C.frog, roughness: 0.4, metalness: 0 }),
+  dark:    new THREE.MeshStandardMaterial({ color: C.frogDark, roughness: 0.5 }),
+  belly:   new THREE.MeshStandardMaterial({ color: C.belly, roughness: 0.4 }),
+  eye:     new THREE.MeshStandardMaterial({ color: C.eye, roughness: 0.15, emissive: C.eye, emissiveIntensity: 0.5 }),
+  pupil:   new THREE.MeshBasicMaterial({ color: C.pupil }),
+  tongue:  new THREE.MeshBasicMaterial({ color: C.tongue }),
+  log:     new THREE.MeshStandardMaterial({ color: C.log, roughness: 0.8 }),
+  logD:    new THREE.MeshStandardMaterial({ color: C.logDark, roughness: 0.9 }),
+  logR:    new THREE.MeshStandardMaterial({ color: C.logRing, roughness: 0.9 }),
+  water:   new THREE.MeshPhysicalMaterial({ color: C.water, transparent: true, opacity: 0.45, roughness: 0.05, metalness: 0.3 }),
+  sun:     new THREE.MeshBasicMaterial({ color: C.sun }),
+  sunG:    new THREE.MeshBasicMaterial({ color: C.sunGlow, transparent: true, opacity: 0.15 }),
+  grass:   new THREE.MeshStandardMaterial({ color: C.grass, roughness: 0.5 }),
+  lily:    new THREE.MeshStandardMaterial({ color: C.lily, roughness: 0.4 }),
+  flower:  new THREE.MeshBasicMaterial({ color: C.flower }),
+  flowerC: new THREE.MeshBasicMaterial({ color: C.flowerC }),
+  fly:     new THREE.MeshBasicMaterial({ color: C.fly }),
+  wing:    new THREE.MeshBasicMaterial({ color: C.wing, transparent: true, opacity: 0.5 }),
+  fire:    new THREE.MeshBasicMaterial({ color: C.firefly }),
+  fireG:   new THREE.MeshBasicMaterial({ color: C.fireflyG, transparent: true, opacity: 0.2 }),
+  moth:    new THREE.MeshStandardMaterial({ color: C.moth, roughness: 0.6 }),
+  mothW:   new THREE.MeshBasicMaterial({ color: C.mothW, transparent: true, opacity: 0.5 }),
+  bfly:    new THREE.MeshBasicMaterial({ color: C.bfly }),
+  ripple:  new THREE.MeshBasicMaterial({ color: C.ripple, transparent: true, opacity: 0.4, side: THREE.DoubleSide }),
+  cloud:   new THREE.MeshBasicMaterial({ color: C.cloud, transparent: true, opacity: 0.6 }),
+  mouth:   new THREE.MeshBasicMaterial({ color: C.mouth }),
+};
+
+// ═══════════════════════════════════════════════
+//  ENVIRONMENT
+// ═══════════════════════════════════════════════
+
+// Water
+const wGeo = new THREE.PlaneGeometry(120, 120, 60, 60);
+const water = new THREE.Mesh(wGeo, M.water);
+water.rotation.x = -Math.PI / 2;
+water.position.y = WATER_Y;
+scene.add(water);
+
+// Sun
+const sunG = new THREE.Group();
+sunG.add(new THREE.Mesh(new THREE.SphereGeometry(2.5, 24, 24), M.sun));
+sunG.add(new THREE.Mesh(new THREE.SphereGeometry(4.0, 24, 24), M.sunG));
+sunG.position.set(15, 25, 10);
+scene.add(sunG);
+
+const rays = new THREE.Group();
+for (let i = 0; i < 10; i++) {
+  const a = (i / 10) * Math.PI * 2;
+  const r = new THREE.Mesh(new THREE.BoxGeometry(0.06, 1.8, 0.06), M.sun);
+  r.position.set(Math.cos(a) * 4.5, Math.sin(a) * 4.5, 0);
+  r.rotation.z = a - Math.PI / 2;
+  rays.add(r);
+}
+rays.position.copy(sunG.position);
+scene.add(rays);
+
+// Log — positioned so top is at LOG_TOP
+const logMesh = new THREE.Mesh(
+  new THREE.CylinderGeometry(LOG_R, LOG_R, LOG_HALF * 2, 24),
+  M.log
+);
+logMesh.rotation.z = Math.PI / 2;
+logMesh.position.set(0, LOG_CY, 0);
+logMesh.castShadow = true;
+logMesh.receiveShadow = true;
+scene.add(logMesh);
+
+// End caps
+const capGeo = new THREE.CircleGeometry(LOG_R, 24);
+const capL = new THREE.Mesh(capGeo, M.logD);
+capL.position.set(-LOG_HALF, LOG_CY, 0);
+capL.rotation.y = Math.PI / 2;
+scene.add(capL);
+const capR = new THREE.Mesh(capGeo, M.logD);
+capR.position.set(LOG_HALF, LOG_CY, 0);
+capR.rotation.y = -Math.PI / 2;
+scene.add(capR);
+
+// Bark rings
+for (let i = 0; i < 4; i++) {
+  const ring = new THREE.Mesh(
+    new THREE.TorusGeometry(LOG_R + 0.02, 0.02, 6, 32),
+    M.logR
+  );
+  ring.position.set(-LOG_HALF + 0.8 + i * 1.8, LOG_CY, 0);
+  ring.rotation.y = Math.PI / 2;
+  scene.add(ring);
+}
+
+// Clouds
+const clouds = Array.from({ length: 6 }, (_, i) => {
+  const g = new THREE.Group();
+  const n = 3 + Math.floor(Math.random() * 3);
+  for (let j = 0; j < n; j++) {
+    const s = 0.8 + Math.random() * 1.0;
+    const puff = new THREE.Mesh(new THREE.SphereGeometry(s, 10, 8), M.cloud);
+    puff.position.set(j * 1.2 - (n - 1) * 0.6, (Math.random() - 0.5) * 0.4, 0);
+    g.add(puff);
+  }
+  g.position.set(-35 + i * 14, 30 + Math.random() * 5, 8 + i * 2);
+  scene.add(g);
+  return g;
+});
+
+// Grass
+const grass = Array.from({ length: 12 }, (_, i) => {
+  const g = new THREE.Group();
+  const n = 4 + Math.floor(Math.random() * 5);
+  for (let j = 0; j < n; j++) {
+    const h = 1.0 + Math.random() * 1.8;
+    const b = new THREE.Mesh(new THREE.ConeGeometry(0.05, h, 5), M.grass);
+    b.position.set((Math.random() - 0.5) * 0.6, h / 2, (Math.random() - 0.5) * 0.4);
+    b.rotation.z = (Math.random() - 0.5) * 0.35;
+    g.add(b);
+  }
+  const side = i < 6 ? -1 : 1;
+  g.position.set(side * (10 + Math.random() * 6), 0, -5 + Math.random() * 10);
+  scene.add(g);
+  return g;
+});
+
+// Lily pads
+const lilies = Array.from({ length: 7 }, (_, i) => {
+  const r = 0.6 + Math.random() * 0.5;
+  const p = new THREE.Mesh(new THREE.CylinderGeometry(r, r, 0.04, 14), M.lily);
+  p.position.set(-15 + i * 5 + (Math.random() - 0.5) * 2, 0.03, 6 + Math.random() * 8);
+  scene.add(p);
+  return p;
+});
+
+// Flowers
+const flowers = lilies.filter((_, i) => i % 2 === 0).map((p) => {
+  const f = new THREE.Mesh(new THREE.SphereGeometry(0.2, 10, 8), M.flower);
+  f.position.set(p.position.x, 0.18, p.position.z);
+  scene.add(f);
+  const c = new THREE.Mesh(new THREE.SphereGeometry(0.08, 8, 6), M.flowerC);
+  c.position.set(p.position.x, 0.24, p.position.z);
+  scene.add(c);
+  return { petal: f, center: c, baseY: 0.18 };
+});
+
+// Ripples (ambient)
+const ripples = Array.from({ length: 6 }, (_, i) => {
+  const r = new THREE.Mesh(new THREE.RingGeometry(0.3, 0.4, 24), M.ripple.clone());
+  r.rotation.x = -Math.PI / 2;
+  r.position.set(-12 + i * 5, 0.05, 4 + i * 3);
+  scene.add(r);
+  return r;
+});
+
+// Splash pool (for dive impacts)
+const splashes = Array.from({ length: 4 }, () => {
+  const s = new THREE.Mesh(new THREE.RingGeometry(0.2, 0.5, 24), M.ripple.clone());
+  s.rotation.x = -Math.PI / 2;
+  s.position.y = 0.06;
+  s.scale.setScalar(0);
+  s.visible = false;
+  scene.add(s);
+  return { mesh: s, timer: -1, maxT: 1.2 };
+});
+
+// ═══════════════════════════════════════════════
+//  CARTOON FROG — bold, round, big eyes
+// ═══════════════════════════════════════════════
+function buildFrog() {
+  const g = new THREE.Group();
+
+  // Body — big round ball
+  const body = new THREE.Mesh(new THREE.SphereGeometry(1, 24, 20), M.frog);
+  body.scale.set(1.1, 0.85, 1.0);
+  body.castShadow = true;
+  g.add(body);
+
+  // Belly — light patch on front-bottom
+  const belly = new THREE.Mesh(new THREE.SphereGeometry(0.75, 18, 14), M.belly);
+  belly.scale.set(0.9, 0.6, 0.7);
+  belly.position.set(0, -0.25, 0.35);
+  g.add(belly);
+
+  // Head — big, merged with body (cartoon = head is huge)
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.8, 24, 20), M.frog);
+  head.scale.set(1.1, 0.9, 1.0);
+  head.position.set(0, 0.5, 0.4);
+  head.castShadow = true;
+  g.add(head);
+
+  // Eyes — HUGE, on top of head, cartoon style
+  const eyeGeo = new THREE.SphereGeometry(0.35, 16, 14);
+  const eL = new THREE.Mesh(eyeGeo, M.eye);
+  eL.position.set(-0.42, 1.15, 0.55);
+  g.add(eL);
+  const eR = new THREE.Mesh(eyeGeo, M.eye);
+  eR.position.set(0.42, 1.15, 0.55);
+  g.add(eR);
+
+  // Pupils — big black dots
+  const pupGeo = new THREE.SphereGeometry(0.16, 12, 10);
+  const pL = new THREE.Mesh(pupGeo, M.pupil);
+  pL.position.set(-0.42, 1.15, 0.85);
+  g.add(pL);
+  const pR = new THREE.Mesh(pupGeo, M.pupil);
+  pR.position.set(0.42, 1.15, 0.85);
+  g.add(pR);
+
+  // Eye highlights (tiny white dot)
+  const hiGeo = new THREE.SphereGeometry(0.05, 8, 6);
+  const hiMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+  const hiL = new THREE.Mesh(hiGeo, hiMat);
+  hiL.position.set(-0.35, 1.22, 0.92);
+  g.add(hiL);
+  const hiR = new THREE.Mesh(hiGeo, hiMat);
+  hiR.position.set(0.35, 1.22, 0.92);
+  g.add(hiR);
+
+  // Mouth — simple arc line
+  const mouth = new THREE.Mesh(
+    new THREE.TorusGeometry(0.4, 0.025, 4, 16, Math.PI * 0.6),
+    M.mouth
+  );
+  mouth.position.set(0, 0.3, 1.1);
+  mouth.rotation.x = 0.2;
+  mouth.rotation.z = Math.PI / 2 - (Math.PI * 0.6) / 2;
+  g.add(mouth);
+
+  // Front legs — short stubs
+  const fLG = new THREE.CylinderGeometry(0.12, 0.14, 0.7, 8);
+  const fl = new THREE.Mesh(fLG, M.frog);
+  fl.position.set(-0.8, -0.55, 0.6);
+  fl.rotation.z = 0.25;
+  fl.rotation.x = -0.15;
+  g.add(fl);
+  const fr = new THREE.Mesh(fLG, M.frog);
+  fr.position.set(0.8, -0.55, 0.6);
+  fr.rotation.z = -0.25;
+  fr.rotation.x = -0.15;
+  g.add(fr);
+
+  // Front feet — flat pads
+  const fFG = new THREE.SphereGeometry(0.16, 8, 6);
+  const ffL = new THREE.Mesh(fFG, M.dark);
+  ffL.scale.set(1.3, 0.35, 1);
+  ffL.position.set(-0.9, -0.9, 0.7);
+  g.add(ffL);
+  const ffR = new THREE.Mesh(fFG, M.dark);
+  ffR.scale.set(1.3, 0.35, 1);
+  ffR.position.set(0.9, -0.9, 0.7);
+  g.add(ffR);
+
+  // Back thighs — big rounded humps (the iconic frog squat)
+  const tG = new THREE.SphereGeometry(0.55, 16, 12);
+  const tl = new THREE.Mesh(tG, M.frog);
+  tl.position.set(-0.95, -0.3, -0.35);
+  tl.scale.set(1.0, 1.1, 1.2);
+  tl.castShadow = true;
+  g.add(tl);
+  const tr = new THREE.Mesh(tG, M.frog);
+  tr.position.set(0.95, -0.3, -0.35);
+  tr.scale.set(1.0, 1.1, 1.2);
+  tr.castShadow = true;
+  g.add(tr);
+
+  // Back lower legs — angled down
+  const bLG = new THREE.CylinderGeometry(0.09, 0.12, 0.7, 8);
+  const bl = new THREE.Mesh(bLG, M.frog);
+  bl.position.set(-1.05, -0.75, 0.05);
+  bl.rotation.x = -0.4;
+  bl.rotation.z = 0.1;
+  g.add(bl);
+  const br = new THREE.Mesh(bLG, M.frog);
+  br.position.set(1.05, -0.75, 0.05);
+  br.rotation.x = -0.4;
+  br.rotation.z = -0.1;
+  g.add(br);
+
+  // Back feet — wide flat
+  const bFG = new THREE.SphereGeometry(0.18, 8, 6);
+  const bfL = new THREE.Mesh(bFG, M.dark);
+  bfL.scale.set(1.5, 0.3, 1.2);
+  bfL.position.set(-1.1, -1.05, 0.3);
+  g.add(bfL);
+  const bfR = new THREE.Mesh(bFG, M.dark);
+  bfR.scale.set(1.5, 0.3, 1.2);
+  bfR.position.set(1.1, -1.05, 0.3);
+  g.add(bfR);
+
+  // Tongue group — anchored at mouth, extends along local +Z
+  const tongueG = new THREE.Group();
+  tongueG.position.set(0, 0.3, 1.05);
+
+  const tongue = new THREE.Mesh(
+    new THREE.CapsuleGeometry(0.05, TONGUE_LEN - 0.3, 6, 10),
+    M.tongue
+  );
+  tongue.rotation.x = Math.PI / 2;
+  tongue.position.set(0, 0, TONGUE_LEN / 2);
+  tongue.scale.set(1, 0.01, 1);
+  tongueG.add(tongue);
+
+  const tip = new THREE.Mesh(new THREE.SphereGeometry(0.1, 10, 8), M.tongue);
+  tip.position.set(0, 0, TONGUE_LEN);
+  tip.scale.setScalar(0.01);
+  tongueG.add(tip);
+
+  g.add(tongueG);
+
+  return { g, tongueG, tongue, tip, eL, eR, pL, pR, hiL, hiR };
+}
+
+// ═══════════════════════════════════════════════
+//  FROG BEHAVIOR
+// ═══════════════════════════════════════════════
+const S = { IDLE: 0, WINDUP: 1, SNAP: 2, RETRACT: 3, JUMP: 4, DIVE: 5, SWIM: 6, HOP: 7 };
+
+function makeFrog(idx) {
+  const parts = buildFrog();
+  const x = -LOG_HALF + 1 + idx * ((LOG_HALF * 2 - 2) / 2);
+
+  const f = {
+    ...parts,
+    state: S.IDLE,
+    t: 0,
+    dur: 1,
+    pos: new THREE.Vector3(x, FROG_REST_Y, 0),
+    from: new THREE.Vector3(),
+    to: new THREE.Vector3(),
+    facing: 1, // 1 = right, -1 = left (only forward jumps)
+    blinkOff: Math.random() * 5,
+    idleDur: 1 + Math.random() * 2,
+    target: null,
+    squash: 1, // for squash & stretch
+  };
+
+  parts.g.position.copy(f.pos);
+  // Face the camera (frog faces +Z toward viewer)
+  parts.g.rotation.y = 0;
+  scene.add(parts.g);
+  return f;
+}
+
+const frogs = [makeFrog(0), makeFrog(1), makeFrog(2)];
+
+function pickAction(f) {
+  f.t = 0;
+  f.squash = 1;
+  const r = Math.random();
+
+  if (r < 0.30) {
+    // Idle
+    f.state = S.IDLE;
+    f.idleDur = 0.8 + Math.random() * 2.5;
+  } else if (r < 0.60) {
+    // Jump along log (always forward in facing direction)
+    f.state = S.JUMP;
+    f.dur = 0.45 + Math.random() * 0.25;
+    f.from.copy(f.pos);
+    const dist = 1.0 + Math.random() * 1.8;
+    let newX = f.pos.x + f.facing * dist;
+    if (newX > LOG_HALF - 0.5) { f.facing = -1; newX = f.pos.x + f.facing * dist; }
+    if (newX < -LOG_HALF + 0.5) { f.facing = 1; newX = f.pos.x + f.facing * dist; }
+    f.to.set(
+      THREE.MathUtils.clamp(newX, -LOG_HALF + 0.5, LOG_HALF - 0.5),
+      FROG_REST_Y, 0
+    );
+  } else if (r < 0.78) {
+    // Dive
+    f.state = S.DIVE;
+    f.dur = 0.55 + Math.random() * 0.2;
+    f.from.copy(f.pos);
+    f.to.set(
+      f.pos.x + (Math.random() - 0.5) * 1.5,
+      SWIM_Y,
+      2.5 + Math.random() * 3
+    );
+  } else {
+    // Idle
+    f.state = S.IDLE;
+    f.idleDur = 0.5 + Math.random() * 1.5;
+  }
+}
+
+function elasticOut(t) {
+  const p = 1.2;
+  return Math.pow(2, -10 * t) * Math.sin((t - p / 4) * (2 * Math.PI) / p) + 1;
+}
+
+function updateFrog(f, t, dt) {
+  f.t += dt;
+  const p = f.g;
+  const prog = Math.min(f.t / f.dur, 1);
+
+  switch (f.state) {
+    case S.IDLE: {
+      p.position.set(f.pos.x, FROG_REST_Y + Math.sin(t * 3 + f.blinkOff) * 0.04, 0);
+      p.rotation.set(0, 0, 0);
+      p.scale.set(1, f.squash, 1);
+
+      // Blink
+      const bc = (t + f.blinkOff) % 3.2;
+      const bs = bc > 2.9 && bc < 3.1 ? 0.05 : 1;
+      f.eL.scale.y = f.pL.scale.y = f.hiL.scale.y = bs;
+      f.eR.scale.y = f.pR.scale.y = f.hiR.scale.y = bs;
+
+      // Look for prey
+      let best = null, bestD = CATCH_RANGE;
+      const mouth = new THREE.Vector3(f.pos.x, FROG_REST_Y + 0.3, 1.0);
+      for (const fly of flies) {
+        if (fly.dead) continue;
+        const d = fly.mesh.position.distanceTo(mouth);
+        if (d < bestD) { bestD = d; best = fly; }
+      }
+
+      if (f.t > f.idleDur) {
+        if (best) {
+          f.state = S.WINDUP;
+          f.t = 0;
+          f.dur = 0.2;
+          f.target = best;
+        } else {
+          pickAction(f);
+        }
+      }
+      break;
+    }
+
+    case S.WINDUP: {
+      // Crouch (squash)
+      const s = 1 - prog * 0.25;
+      f.squash = s;
+      p.scale.set(1 + (1 - s) * 0.3, s, 1 + (1 - s) * 0.3);
+      p.position.set(f.pos.x, FROG_REST_Y - prog * 0.2, 0);
+      p.rotation.set(0, 0, 0);
+
+      if (prog >= 1) {
+        f.state = S.SNAP;
+        f.t = 0;
+        f.dur = 0.18;
+      }
+      break;
+    }
+
+    case S.SNAP: {
+      // Stretch + tongue out
+      p.scale.set(0.85, 1.25, 0.85);
+      p.position.set(f.pos.x, FROG_REST_Y + 0.1, 0);
+
+      const s = prog;
+      if (f.target && !f.target.dead) {
+        const mouth = new THREE.Vector3(f.pos.x, FROG_REST_Y + 0.3, 1.0);
+        const dir = f.target.mesh.position.clone().sub(mouth).normalize();
+        f.tongueG.rotation.set(
+          Math.asin(THREE.MathUtils.clamp(-dir.y, -1, 1)),
+          Math.atan2(dir.x, dir.z),
+          0
+        );
+      }
+      f.tongue.scale.y = Math.max(0.01, s);
+      f.tip.scale.setScalar(Math.max(0.01, s));
+      f.tip.position.z = 0.3 + s * TONGUE_LEN;
+
+      if (prog >= 1) {
+        if (f.target && !f.target.dead) {
+          f.target.dead = true;
+          f.target.deadT = 0;
+        }
+        f.state = S.RETRACT;
+        f.t = 0;
+        f.dur = 0.25;
+      }
+      break;
+    }
+
+    case S.RETRACT: {
+      const s = 1 - prog;
+      f.tongue.scale.y = Math.max(0.01, s);
+      f.tip.scale.setScalar(Math.max(0.01, s));
+      f.tip.position.z = 0.3 + s * TONGUE_LEN;
+      p.scale.set(1, 1, 1);
+      p.position.set(f.pos.x, FROG_REST_Y, 0);
+
+      if (prog >= 1) {
+        f.tongue.scale.y = 0.01;
+        f.tip.scale.setScalar(0.01);
+        f.tongueG.rotation.set(0, 0, 0);
+        pickAction(f);
+      }
+      break;
+    }
+
+    case S.JUMP: {
+      // Cartoon arc with squash & stretch
+      const arcH = 2.0;
+      const ease = prog;
+      const x = THREE.MathUtils.lerp(f.from.x, f.to.x, ease);
+      const y = FROG_REST_Y + Math.sin(prog * Math.PI) * arcH;
+
+      // Stretch going up, squash coming down
+      const stretch = 1 + Math.sin(prog * Math.PI) * 0.3;
+      p.scale.set(1 / Math.sqrt(stretch), stretch, 1 / Math.sqrt(stretch));
+      p.position.set(x, y, 0);
+      p.rotation.z = (f.to.x - f.from.x) * -0.06;
+      f.pos.x = x;
+
+      if (prog >= 1) {
+        f.pos.set(f.to.x, FROG_REST_Y, 0);
+        p.position.copy(f.pos);
+        p.rotation.z = 0;
+        p.scale.set(1.3, 0.7, 1.3); // landing squash
+        f.squash = 0.7;
+        // recover squash next frame
+        setTimeout(() => { f.squash = 1; }, 150);
+        pickAction(f);
+      }
+      break;
+    }
+
+    case S.DIVE: {
+      const ease = prog * prog; // accelerating fall
+      const x = THREE.MathUtils.lerp(f.from.x, f.to.x, ease);
+      const y = THREE.MathUtils.lerp(f.from.y, f.to.y, ease);
+      const z = THREE.MathUtils.lerp(f.from.z, f.to.z, ease);
+      p.position.set(x, y, z);
+      p.rotation.x = -prog * 0.8;
+      p.scale.set(0.9, 1.1, 0.9);
+      f.pos.set(x, y, z);
+
+      if (prog >= 1) {
+        // Splash!
+        const sp = splashes.find(s => s.timer < 0);
+        if (sp) {
+          sp.timer = 0;
+          sp.mesh.position.set(f.pos.x, 0.06, f.pos.z);
+          sp.mesh.visible = true;
+        }
+        f.state = S.SWIM;
+        f.t = 0;
+        f.dur = 2 + Math.random() * 2.5;
+        f.from.copy(f.pos);
+        f.to.set(
+          THREE.MathUtils.clamp(f.pos.x + (Math.random() - 0.5) * 4, -LOG_HALF, LOG_HALF),
+          SWIM_Y,
+          f.pos.z + 1 + Math.random() * 2
+        );
+      }
+      break;
+    }
+
+    case S.SWIM: {
+      const ease = THREE.MathUtils.smoothstep(prog, 0, 1);
+      const x = THREE.MathUtils.lerp(f.from.x, f.to.x, ease);
+      const z = THREE.MathUtils.lerp(f.from.z, f.to.z, ease);
+      const bob = Math.sin(t * 5 + f.blinkOff) * 0.08;
+      p.position.set(x, SWIM_Y + bob, z);
+      p.rotation.x = 0;
+      p.rotation.y = Math.sin(t * 1.5 + f.blinkOff) * 0.4;
+      p.scale.set(1, 0.85, 1); // slightly flattened in water
+      f.pos.set(x, SWIM_Y, z);
+
+      if (prog >= 1) {
+        f.state = S.HOP;
+        f.t = 0;
+        f.dur = 0.6;
+        f.from.copy(f.pos);
+        f.to.set(
+          THREE.MathUtils.clamp(f.pos.x, -LOG_HALF + 0.5, LOG_HALF - 0.5),
+          FROG_REST_Y, 0
+        );
+      }
+      break;
+    }
+
+    case S.HOP: {
+      const x = THREE.MathUtils.lerp(f.from.x, f.to.x, prog);
+      const y = THREE.MathUtils.lerp(f.from.y, f.to.y, prog) + Math.sin(prog * Math.PI) * 2.2;
+      const z = THREE.MathUtils.lerp(f.from.z, f.to.z, prog);
+      const stretch = 1 + Math.sin(prog * Math.PI) * 0.25;
+      p.position.set(x, y, z);
+      p.scale.set(1 / Math.sqrt(stretch), stretch, 1 / Math.sqrt(stretch));
+      p.rotation.set(0, 0, 0);
+      f.pos.set(x, y, z);
+
+      if (prog >= 1) {
+        f.pos.set(f.to.x, FROG_REST_Y, 0);
+        p.position.copy(f.pos);
+        p.scale.set(1.3, 0.7, 1.3);
+        f.squash = 0.7;
+        setTimeout(() => { f.squash = 1; }, 150);
+        pickAction(f);
+      }
+      break;
+    }
+  }
+}
+
+// ═══════════════════════════════════════════════
+//  INSECTS
+// ═══════════════════════════════════════════════
+
+// Flies
+const flies = Array.from({ length: 10 }, () => {
+  const g = new THREE.Group();
+  g.add(new THREE.Mesh(new THREE.SphereGeometry(0.1, 10, 8), M.fly));
+  const wG = new THREE.SphereGeometry(0.07, 4, 3);
+  const w1 = new THREE.Mesh(wG, M.wing);
+  const w2 = new THREE.Mesh(wG, M.wing);
+  w1.position.set(0.07, 0.05, 0);
+  w2.position.set(-0.07, 0.05, 0);
+  g.add(w1);
+  g.add(w2);
+  scene.add(g);
+  return {
+    mesh: g, w: [w1, w2],
+    r: 2 + Math.random() * 3.5,
+    sp: 1.0 + Math.random() * 2.0,
+    h: 3.5 + Math.random() * 2.5,
+    ph: Math.random() * Math.PI * 2,
+    dead: false, deadT: 0,
+  };
+});
+
+// Fireflies
+const fireflies = Array.from({ length: 14 }, () => {
+  const g = new THREE.Group();
+  const core = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 6), M.fire);
+  const glow = new THREE.Mesh(new THREE.SphereGeometry(0.18, 8, 6), M.fireG.clone());
+  g.add(core);
+  g.add(glow);
+  scene.add(g);
+  return {
+    mesh: g, glow,
+    bx: -20 + Math.random() * 40,
+    by: 0.5 + Math.random() * 5,
+    bz: -4 + Math.random() * 14,
+    sp: 0.15 + Math.random() * 0.5,
+    ph: Math.random() * Math.PI * 2,
+    pulse: 2 + Math.random() * 4,
+  };
+});
+
+// Moths
+const moths = Array.from({ length: 5 }, () => {
+  const g = new THREE.Group();
+  g.add(new THREE.Mesh(new THREE.CapsuleGeometry(0.08, 0.2, 4, 6), M.moth));
+  const wG = new THREE.SphereGeometry(0.22, 6, 4);
+  const wL = new THREE.Mesh(wG, M.mothW);
+  const wR = new THREE.Mesh(wG, M.mothW);
+  wL.position.set(-0.2, 0, 0);
+  wL.scale.set(1, 1.4, 0.25);
+  wR.position.set(0.2, 0, 0);
+  wR.scale.set(1, 1.4, 0.25);
+  g.add(wL);
+  g.add(wR);
+  scene.add(g);
+  return {
+    mesh: g, w: [wL, wR],
+    r: 5 + Math.random() * 6,
+    sp: 0.25 + Math.random() * 0.4,
+    h: 4 + Math.random() * 4,
+    ph: Math.random() * Math.PI * 2,
+    wob: 0.5 + Math.random() * 2,
+  };
+});
+
+// Butterfly
+const bflyG = new THREE.Group();
+const bWG = new THREE.SphereGeometry(0.15, 8, 6);
+const bW1 = new THREE.Mesh(bWG, M.bfly);
+const bW2 = new THREE.Mesh(bWG, M.bfly);
+bW1.position.set(-0.15, 0, 0);
+bW1.scale.set(1, 1.4, 0.25);
+bW2.position.set(0.15, 0, 0);
+bW2.scale.set(1, 1.4, 0.25);
+bflyG.add(bW1);
+bflyG.add(bW2);
+bflyG.position.set(8, 14, 5);
+scene.add(bflyG);
+
+// ═══════════════════════════════════════════════
+//  MAIN LOOP
+// ═══════════════════════════════════════════════
+let lastTime = 0;
+
+function loop(now) {
+  requestAnimationFrame(loop);
+  const t = now * 0.001;
+  const dt = Math.min(t - lastTime, 0.05);
+  lastTime = t;
+
+  // Water vertices
+  const wp = wGeo.attributes.position;
+  for (let i = 0; i < wp.count; i++) {
+    const x = wp.getX(i), y = wp.getY(i);
+    wp.setZ(i, Math.sin(x * 0.3 + t * 0.6) * 0.12 + Math.cos(y * 0.25 + t * 0.4) * 0.08);
+  }
+  wp.needsUpdate = true;
+  wGeo.computeVertexNormals();
+
+  // Frogs
+  for (const f of frogs) updateFrog(f, t, dt);
+
+  // Flies
+  for (const fly of flies) {
+    if (fly.dead) {
+      fly.deadT += dt;
+      fly.mesh.scale.setScalar(Math.max(0.01, 1 - fly.deadT * 2.5));
+      if (fly.deadT > 3) {
+        fly.dead = false;
+        fly.deadT = 0;
+        fly.r = 2 + Math.random() * 3.5;
+        fly.sp = 1.0 + Math.random() * 2.0;
+        fly.h = 3.5 + Math.random() * 2.5;
+        fly.ph = Math.random() * Math.PI * 2;
+      }
+      continue;
+    }
+    fly.mesh.scale.setScalar(1);
+    const a = t * fly.sp + fly.ph;
+    fly.mesh.position.set(
+      Math.cos(a) * fly.r,
+      fly.h + Math.sin(t * 3 + fly.ph) * 0.5,
+      Math.sin(a) * fly.r * 0.5
+    );
+    const flap = Math.sin(t * 30 + fly.ph) * 0.6;
+    fly.w[0].rotation.y = flap;
+    fly.w[1].rotation.y = -flap;
+  }
+
+  // Fireflies
+  for (const ff of fireflies) {
+    const a = t * ff.sp + ff.ph;
+    ff.mesh.position.set(
+      ff.bx + Math.sin(a) * 3,
+      ff.by + Math.sin(t * 0.5 + ff.ph) * 0.8,
+      ff.bz + Math.cos(a * 0.7) * 2
+    );
+    const pulse = 0.5 + Math.sin(t * ff.pulse + ff.ph) * 0.5;
+    ff.glow.scale.setScalar(0.4 + pulse * 1.2);
+    ff.glow.material.opacity = 0.08 + pulse * 0.3;
+  }
+
+  // Moths
+  for (const m of moths) {
+    const a = t * m.sp + m.ph;
+    m.mesh.position.set(
+      Math.cos(a) * m.r + Math.sin(t * m.wob + m.ph) * 1,
+      m.h + Math.sin(t * 1.2 + m.ph) * 1.2,
+      Math.sin(a) * m.r * 0.4
+    );
+    m.mesh.rotation.y = a + Math.PI / 2;
+    const flap = Math.sin(t * 6 + m.ph) * 0.4;
+    m.w[0].rotation.y = flap;
+    m.w[1].rotation.y = -flap;
+  }
+
+  // Butterfly
+  bflyG.position.set(
+    7 + Math.sin(t * 0.5) * 6,
+    13 + Math.sin(t * 1.2) * 2,
+    4 + Math.cos(t * 0.4) * 4
+  );
+  bflyG.rotation.y = Math.sin(t * 0.5) * 0.6;
+  const bflap = Math.sin(t * 18) * 0.5;
+  bW1.scale.y = 1 + bflap;
+  bW2.scale.y = 1 + bflap;
+
+  // Clouds
+  for (let i = 0; i < clouds.length; i++) {
+    clouds[i].position.x += (i % 2 === 0 ? 0.012 : -0.008);
+    if (clouds[i].position.x > 45) clouds[i].position.x = -45;
+    if (clouds[i].position.x < -45) clouds[i].position.x = 45;
+  }
+
+  // Grass
+  for (let i = 0; i < grass.length; i++) {
+    grass[i].rotation.z = Math.sin(t * 1.5 + i * 0.8) * 0.1;
+  }
+
+  // Lilies
+  for (let i = 0; i < lilies.length; i++) {
+    lilies[i].position.y = 0.03 + Math.sin(t * 0.8 + i * 1.3) * 0.04;
+  }
+
+  // Flowers
+  for (const fl of flowers) {
+    fl.petal.position.y = fl.baseY + Math.sin(t * 1.3) * 0.03;
+    fl.center.position.y = fl.baseY + 0.06 + Math.sin(t * 1.3) * 0.03;
+  }
+
+  // Ripples
+  for (let i = 0; i < ripples.length; i++) {
+    const p = (t * 0.4 + i * 0.4) % 2.5;
+    ripples[i].scale.setScalar(1 + p * 2);
+    ripples[i].material.opacity = Math.max(0, 0.3 * (1 - p / 2.5));
+  }
+
+  // Splashes
+  for (const sp of splashes) {
+    if (sp.timer < 0) continue;
+    sp.timer += dt;
+    const p = sp.timer / sp.maxT;
+    if (p >= 1) {
+      sp.timer = -1;
+      sp.mesh.visible = false;
+      continue;
+    }
+    sp.mesh.visible = true;
+    sp.mesh.scale.setScalar(1 + p * 4);
+    sp.mesh.material.opacity = 0.4 * (1 - p);
+  }
+
+  // Sun rays
+  rays.rotation.z = t * 0.12;
+
+  // Camera
+  cam.position.x = Math.sin(t * 0.06) * 3;
+  cam.position.y = 6 + Math.sin(t * 0.09) * 0.8;
+  cam.lookAt(0, 2.5, 0);
+
+  renderer.render(scene, cam);
+}
+
+requestAnimationFrame(loop);
+
+addEventListener("resize", () => {
+  cam.aspect = innerWidth / innerHeight;
+  cam.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+</script>
+</body>
+</html>
