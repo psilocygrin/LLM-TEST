@@ -1,0 +1,1108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>frog pond</title>
+  <style>
+    * { margin: 0; padding: 0; }
+    body { overflow: hidden; background: #07070f; }
+    canvas { display: block; }
+  </style>
+</head>
+<body>
+<script type="module">
+import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.module.js";
+
+// ═══════════════════════════════════════════════
+//  CONSTANTS
+// ═══════════════════════════════════════════════
+const LOG_R = 1.0;
+const LOG_HALF = 4.0;
+const LOG_CY = 0.8;
+const LOG_TOP = LOG_CY + LOG_R; // 1.8 — top surface of cylinder at z=0
+const FROG_BOTTOM = 1.05; // lowest point of frog in local space (back feet)
+const FROG_REST_Y = LOG_TOP + FROG_BOTTOM; // 2.85 — frog feet touch log surface
+const WATER_Y = 0.0;
+const SWIM_Y = 0.15;
+const TONGUE_MAX = 6.0;
+const CATCH_RANGE = 7.0;
+const FROG_MIN_DIST = 3.5;
+const RAIN_COUNT = 180;
+const SEP_STRENGTH = 5.0;
+
+// ═══════════════════════════════════════════════
+//  PALETTE
+// ═══════════════════════════════════════════════
+const C = {
+  bg: 0x0b0b20, water: 0x00e5ff, frog: 0x00ff66, frogDark: 0x00b347,
+  belly: 0xaaffcc, eye: 0xffff00, pupil: 0x111111, tongue: 0xff3366,
+  sun: 0xffcc00, sunGlow: 0xff9900, moon: 0xc8d8ff, moonGlow: 0x8899cc,
+  log: 0x6d4c41, logDark: 0x4e342e, logRing: 0x3e2723, grass: 0x00e676,
+  lily: 0x1de9b6, flower: 0xff4081, flowerC: 0xffee58, fly: 0xffeb3b,
+  wing: 0xffffff, firefly: 0x76ff03, moth: 0xbcaaa4, mothW: 0xd7ccc8,
+  bfly: 0xff5722, ripple: 0x84ffff, cloud: 0x3a3a6a, rain: 0x88ccff,
+  mouth: 0x1a1a2e,
+};
+
+// ═══════════════════════════════════════════════
+//  SCENE / CAMERA / RENDERER
+// ═══════════════════════════════════════════════
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(C.bg);
+scene.fog = new THREE.Fog(C.bg, 40, 110);
+
+const cam = new THREE.PerspectiveCamera(52, innerWidth / innerHeight, 0.1, 250);
+cam.position.set(0, 4.5, 22);
+cam.lookAt(0, 2, 0);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(devicePixelRatio);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+document.body.appendChild(renderer.domElement);
+
+// ═══════════════════════════════════════════════
+//  LIGHTS
+// ═══════════════════════════════════════════════
+scene.add(new THREE.AmbientLight(0x334466, 1.2));
+
+const key = new THREE.DirectionalLight(C.sun, 1.0);
+key.position.set(15, 18, 10);
+key.castShadow = true;
+key.shadow.mapSize.set(2048, 2048);
+key.shadow.camera.left = -30;
+key.shadow.camera.right = 30;
+key.shadow.camera.top = 30;
+key.shadow.camera.bottom = -30;
+key.shadow.camera.far = 80;
+scene.add(key);
+
+const moonLight = new THREE.DirectionalLight(C.moon, 0.4);
+moonLight.position.set(-15, 20, -15);
+scene.add(moonLight);
+
+const fill = new THREE.DirectionalLight(C.water, 0.25);
+fill.position.set(-8, 4, -6);
+scene.add(fill);
+
+// ═══════════════════════════════════════════════
+//  MATERIALS
+// ═══════════════════════════════════════════════
+const M = {
+  frog:    new THREE.MeshStandardMaterial({ color: C.frog, roughness: 0.4 }),
+  dark:    new THREE.MeshStandardMaterial({ color: C.frogDark, roughness: 0.5 }),
+  belly:   new THREE.MeshStandardMaterial({ color: C.belly, roughness: 0.4 }),
+  eye:     new THREE.MeshStandardMaterial({ color: C.eye, roughness: 0.1, emissive: C.eye, emissiveIntensity: 0.4 }),
+  pupil:   new THREE.MeshBasicMaterial({ color: C.pupil }),
+  tongue:  new THREE.MeshBasicMaterial({ color: C.tongue }),
+  log:     new THREE.MeshStandardMaterial({ color: C.log, roughness: 0.8 }),
+  logD:    new THREE.MeshStandardMaterial({ color: C.logDark, roughness: 0.9 }),
+  logR:    new THREE.MeshStandardMaterial({ color: C.logRing, roughness: 0.9 }),
+  water:   new THREE.MeshPhysicalMaterial({ color: C.water, transparent: true, opacity: 0.35, roughness: 0.05, metalness: 0.3 }),
+  sun:     new THREE.MeshBasicMaterial({ color: C.sun }),
+  sunG:    new THREE.MeshBasicMaterial({ color: C.sunGlow, transparent: true, opacity: 0.12 }),
+  moon:    new THREE.MeshBasicMaterial({ color: C.moon }),
+  moonG:   new THREE.MeshBasicMaterial({ color: C.moonGlow, transparent: true, opacity: 0.12 }),
+  grass:   new THREE.MeshStandardMaterial({ color: C.grass, roughness: 0.5 }),
+  lily:    new THREE.MeshStandardMaterial({ color: C.lily, roughness: 0.4 }),
+  flower:  new THREE.MeshBasicMaterial({ color: C.flower }),
+  flowerC: new THREE.MeshBasicMaterial({ color: C.flowerC }),
+  fly:     new THREE.MeshBasicMaterial({ color: C.fly }),
+  wing:    new THREE.MeshBasicMaterial({ color: C.wing, transparent: true, opacity: 0.4 }),
+  fire:    new THREE.MeshBasicMaterial({ color: C.firefly }),
+  fireG:   new THREE.MeshBasicMaterial({ color: C.firefly, transparent: true, opacity: 0.15 }),
+  moth:    new THREE.MeshStandardMaterial({ color: C.moth, roughness: 0.6 }),
+  mothW:   new THREE.MeshBasicMaterial({ color: C.mothW, transparent: true, opacity: 0.45 }),
+  bfly:    new THREE.MeshBasicMaterial({ color: C.bfly }),
+  ripple:  new THREE.MeshBasicMaterial({ color: C.ripple, transparent: true, opacity: 0.4, side: THREE.DoubleSide }),
+  cloud:   new THREE.MeshBasicMaterial({ color: C.cloud, transparent: true, opacity: 0.55 }),
+  rain:    new THREE.MeshBasicMaterial({ color: C.rain, transparent: true, opacity: 0.5 }),
+  mouth:   new THREE.MeshBasicMaterial({ color: C.mouth }),
+};
+
+// ═══════════════════════════════════════════════
+//  LOG COLLISION HELPERS
+// ═══════════════════════════════════════════════
+// The log is a cylinder along X: radius LOG_R, center (0, LOG_CY, 0), |x|<=LOG_HALF
+// Top surface at z: y = LOG_CY + sqrt(LOG_R² - z²)  (for |z| <= LOG_R)
+
+function logSurfaceY(z) {
+  if (Math.abs(z) >= LOG_R) return -Infinity;
+  const dz = z * z;
+  if (dz >= LOG_R * LOG_R) return -Infinity;
+  return LOG_CY + Math.sqrt(LOG_R * LOG_R - dz);
+}
+
+// Returns true if a point is inside the log cylinder
+function isInsideLog(x, y, z) {
+  if (Math.abs(x) > LOG_HALF) return false;
+  const dy = y - LOG_CY;
+  const distSq = dy * dy + z * z;
+  return distSq < LOG_R * LOG_R;
+}
+
+// Push a frog out of the log if it's intersecting.
+// The frog's lowest point is at pos.y - FROG_BOTTOM.
+function resolveLogCollision(f) {
+  const { x, y, z } = f.pos;
+  if (Math.abs(x) > LOG_HALF) return;
+
+  const surfY = logSurfaceY(z);
+  if (surfY === -Infinity) return; // not over the log's circular cross-section
+
+  // If the frog's bottom is below the log surface, push it up
+  const frogBottom = y - FROG_BOTTOM;
+  if (frogBottom < surfY && y > LOG_CY) {
+    f.pos.y = surfY + FROG_BOTTOM;
+  }
+
+  // Also check if the frog center is inside the cylinder (shouldn't happen, but safety)
+  if (isInsideLog(x, y, z)) {
+    const dy = y - LOG_CY;
+    const dist = Math.sqrt(dy * dy + z * z) || 0.001;
+    const ny = dy / dist, nz = z / dist;
+    f.pos.y = LOG_CY + ny * (LOG_R + FROG_BOTTOM);
+    f.pos.z = nz * (LOG_R + FROG_BOTTOM);
+  }
+}
+
+// ═══════════════════════════════════════════════
+//  ENVIRONMENT
+// ═══════════════════════════════════════════════
+
+const wGeo = new THREE.PlaneGeometry(160, 160, 50, 50);
+const water = new THREE.Mesh(wGeo, M.water);
+water.rotation.x = -Math.PI / 2;
+water.position.y = WATER_Y;
+scene.add(water);
+
+// Moon
+const moonG = new THREE.Group();
+moonG.add(new THREE.Mesh(new THREE.SphereGeometry(2.5, 24, 24), M.moon));
+moonG.add(new THREE.Mesh(new THREE.SphereGeometry(4.0, 24, 24), M.moonG));
+moonG.position.set(-14, 15, -28);
+scene.add(moonG);
+
+const moonShadow = new THREE.Mesh(
+  new THREE.SphereGeometry(2.3, 24, 24),
+  new THREE.MeshBasicMaterial({ color: C.bg })
+);
+moonShadow.position.set(-13.2, 15.6, -27.5);
+scene.add(moonShadow);
+
+// Sun
+const sunG = new THREE.Group();
+sunG.add(new THREE.Mesh(new THREE.SphereGeometry(2.2, 24, 24), M.sun));
+sunG.add(new THREE.Mesh(new THREE.SphereGeometry(3.8, 24, 24), M.sunG));
+sunG.position.set(18, 13, -25);
+scene.add(sunG);
+
+// Clouds
+const clouds = Array.from({ length: 6 }, (_, i) => {
+  const g = new THREE.Group();
+  const n = 3 + Math.floor(Math.random() * 3);
+  for (let j = 0; j < n; j++) {
+    const s = 1.2 + Math.random() * 1.5;
+    const puff = new THREE.Mesh(new THREE.SphereGeometry(s, 10, 8), M.cloud);
+    puff.position.set(j * 1.8 - (n - 1) * 0.9, (Math.random() - 0.5) * 0.6, 0);
+    g.add(puff);
+  }
+  g.position.set(-30 + i * 14, 11 + Math.random() * 5, -18 + i * 3);
+  scene.add(g);
+  return { group: g, speed: 0.3 + Math.random() * 0.4 };
+});
+
+// Log
+const logMesh = new THREE.Mesh(
+  new THREE.CylinderGeometry(LOG_R, LOG_R, LOG_HALF * 2, 24), M.log
+);
+logMesh.rotation.z = Math.PI / 2;
+logMesh.position.set(0, LOG_CY, 0);
+logMesh.castShadow = true;
+logMesh.receiveShadow = true;
+scene.add(logMesh);
+
+const capGeo = new THREE.CircleGeometry(LOG_R, 24);
+const capL = new THREE.Mesh(capGeo, M.logD);
+capL.position.set(-LOG_HALF, LOG_CY, 0);
+capL.rotation.y = Math.PI / 2;
+scene.add(capL);
+const capR = new THREE.Mesh(capGeo, M.logD);
+capR.position.set(LOG_HALF, LOG_CY, 0);
+capR.rotation.y = -Math.PI / 2;
+scene.add(capR);
+
+for (let i = 0; i < 5; i++) {
+  const ring = new THREE.Mesh(
+    new THREE.TorusGeometry(LOG_R + 0.02, 0.02, 6, 32), M.logR
+  );
+  ring.position.set(-LOG_HALF + 0.7 + i * 1.6, LOG_CY, 0);
+  ring.rotation.y = Math.PI / 2;
+  scene.add(ring);
+}
+
+// Grass
+const grass = Array.from({ length: 18 }, (_, i) => {
+  const g = new THREE.Group();
+  const n = 5 + Math.floor(Math.random() * 5);
+  for (let j = 0; j < n; j++) {
+    const h = 0.8 + Math.random() * 2.0;
+    const b = new THREE.Mesh(new THREE.ConeGeometry(0.04, h, 5), M.grass);
+    b.position.set((Math.random() - 0.5) * 0.6, h / 2, (Math.random() - 0.5) * 0.4);
+    b.rotation.z = (Math.random() - 0.5) * 0.3;
+    g.add(b);
+  }
+  const side = i < 9 ? -1 : 1;
+  g.position.set(side * (8 + Math.random() * 10), 0, -8 + Math.random() * 18);
+  scene.add(g);
+  return g;
+});
+
+// Lily pads
+const lilies = Array.from({ length: 10 }, (_, i) => {
+  const r = 0.5 + Math.random() * 0.5;
+  const p = new THREE.Mesh(new THREE.CylinderGeometry(r, r, 0.04, 14), M.lily);
+  p.position.set(-14 + i * 3.5 + (Math.random() - 0.5) * 3, 0.03, 4 + Math.random() * 14);
+  scene.add(p);
+  return p;
+});
+
+const flowers = lilies.filter((_, i) => i % 2 === 0).map((p) => {
+  const f = new THREE.Mesh(new THREE.SphereGeometry(0.22, 10, 8), M.flower);
+  f.position.set(p.position.x, 0.18, p.position.z);
+  scene.add(f);
+  const c = new THREE.Mesh(new THREE.SphereGeometry(0.09, 8, 6), M.flowerC);
+  c.position.set(p.position.x, 0.25, p.position.z);
+  scene.add(c);
+  return { petal: f, center: c, baseY: 0.18 };
+});
+
+const ripples = Array.from({ length: 10 }, (_, i) => {
+  const r = new THREE.Mesh(new THREE.RingGeometry(0.25, 0.4, 24), M.ripple.clone());
+  r.rotation.x = -Math.PI / 2;
+  r.position.set(-14 + i * 3.5, 0.05, 3 + (i % 3) * 5);
+  scene.add(r);
+  return r;
+});
+
+const splashes = Array.from({ length: 6 }, () => {
+  const s = new THREE.Mesh(new THREE.RingGeometry(0.3, 0.6, 24), M.ripple.clone());
+  s.rotation.x = -Math.PI / 2;
+  s.position.y = 0.06;
+  s.scale.setScalar(0);
+  s.visible = false;
+  scene.add(s);
+  return { mesh: s, timer: -1, maxT: 1.5 };
+});
+
+// ═══════════════════════════════════════════════
+//  RAIN
+// ═══════════════════════════════════════════════
+const rainGeo = new THREE.CylinderGeometry(0.02, 0.02, 0.8, 4);
+const rainMeshes = [];
+for (let i = 0; i < RAIN_COUNT; i++) {
+  const drop = new THREE.Mesh(rainGeo, M.rain);
+  drop.position.set((Math.random() - 0.5) * 50, Math.random() * 30 + 5, (Math.random() - 0.5) * 30);
+  scene.add(drop);
+  rainMeshes.push(drop);
+}
+let raining = false;
+let rainTimer = 0;
+const RAIN_CYCLE = 14;
+
+// ═══════════════════════════════════════════════
+//  FROG BUILDER
+// ═══════════════════════════════════════════════
+function buildFrog() {
+  const g = new THREE.Group();
+
+  const body = new THREE.Mesh(new THREE.SphereGeometry(1, 24, 20), M.frog);
+  body.scale.set(1.1, 0.85, 1.0);
+  body.castShadow = true;
+  g.add(body);
+
+  const belly = new THREE.Mesh(new THREE.SphereGeometry(0.7, 16, 12), M.belly);
+  belly.scale.set(0.9, 0.55, 0.65);
+  belly.position.set(0, -0.2, 0.3);
+  g.add(belly);
+
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.8, 24, 20), M.frog);
+  head.scale.set(1.1, 0.95, 1.0);
+  head.position.set(0, 0.55, 0.4);
+  head.castShadow = true;
+  g.add(head);
+
+  const eyeGeo = new THREE.SphereGeometry(0.38, 16, 14);
+  const eL = new THREE.Mesh(eyeGeo, M.eye);
+  eL.position.set(-0.40, 1.25, 0.58);
+  g.add(eL);
+  const eR = new THREE.Mesh(eyeGeo, M.eye);
+  eR.position.set(0.40, 1.25, 0.58);
+  g.add(eR);
+
+  const pupGeo = new THREE.SphereGeometry(0.17, 12, 10);
+  const pL = new THREE.Mesh(pupGeo, M.pupil);
+  pL.position.set(-0.40, 1.25, 0.92);
+  g.add(pL);
+  const pR = new THREE.Mesh(pupGeo, M.pupil);
+  pR.position.set(0.40, 1.25, 0.92);
+  g.add(pR);
+
+  const hiGeo = new THREE.SphereGeometry(0.07, 8, 6);
+  const hiMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+  const hiL = new THREE.Mesh(hiGeo, hiMat);
+  hiL.position.set(-0.32, 1.34, 1.0);
+  g.add(hiL);
+  const hiR = new THREE.Mesh(hiGeo, hiMat);
+  hiR.position.set(0.32, 1.34, 1.0);
+  g.add(hiR);
+
+  // Smile
+  const mouth = new THREE.Mesh(
+    new THREE.TorusGeometry(0.28, 0.035, 4, 16, Math.PI), M.mouth
+  );
+  mouth.position.set(0, 0.22, 1.02);
+  mouth.rotation.z = Math.PI;
+  g.add(mouth);
+
+  const throat = new THREE.Mesh(new THREE.CircleGeometry(0.20, 16), M.mouth);
+  throat.position.set(0, 0.22, 0.96);
+  throat.scale.setScalar(0.01);
+  g.add(throat);
+
+  // Front legs
+  const fLG = new THREE.CylinderGeometry(0.12, 0.14, 0.7, 8);
+  const fl = new THREE.Mesh(fLG, M.frog);
+  fl.position.set(-0.8, -0.55, 0.6);
+  fl.rotation.z = 0.25;
+  fl.rotation.x = -0.15;
+  g.add(fl);
+  const fr = new THREE.Mesh(fLG, M.frog);
+  fr.position.set(0.8, -0.55, 0.6);
+  fr.rotation.z = -0.25;
+  fr.rotation.x = -0.15;
+  g.add(fr);
+
+  const fFG = new THREE.SphereGeometry(0.16, 8, 6);
+  const ffL = new THREE.Mesh(fFG, M.dark);
+  ffL.scale.set(1.3, 0.35, 1);
+  ffL.position.set(-0.9, -0.9, 0.7);
+  g.add(ffL);
+  const ffR = new THREE.Mesh(fFG, M.dark);
+  ffR.scale.set(1.3, 0.35, 1);
+  ffR.position.set(0.9, -0.9, 0.7);
+  g.add(ffR);
+
+  // Back thighs
+  const tG = new THREE.SphereGeometry(0.55, 16, 12);
+  const tl = new THREE.Mesh(tG, M.frog);
+  tl.position.set(-0.95, -0.3, -0.35);
+  tl.scale.set(1.0, 1.1, 1.2);
+  tl.castShadow = true;
+  g.add(tl);
+  const tr = new THREE.Mesh(tG, M.frog);
+  tr.position.set(0.95, -0.3, -0.35);
+  tr.scale.set(1.0, 1.1, 1.2);
+  tr.castShadow = true;
+  g.add(tr);
+
+  const bLG = new THREE.CylinderGeometry(0.09, 0.12, 0.7, 8);
+  const bl = new THREE.Mesh(bLG, M.frog);
+  bl.position.set(-1.05, -0.75, 0.05);
+  bl.rotation.x = -0.4;
+  bl.rotation.z = 0.1;
+  g.add(bl);
+  const br = new THREE.Mesh(bLG, M.frog);
+  br.position.set(1.05, -0.75, 0.05);
+  br.rotation.x = -0.4;
+  br.rotation.z = -0.1;
+  g.add(br);
+
+  const bFG = new THREE.SphereGeometry(0.18, 8, 6);
+  const bfL = new THREE.Mesh(bFG, M.dark);
+  bfL.scale.set(1.5, 0.3, 1.2);
+  bfL.position.set(-1.1, -1.05, 0.3);
+  g.add(bfL);
+  const bfR = new THREE.Mesh(bFG, M.dark);
+  bfR.scale.set(1.5, 0.3, 1.2);
+  bfR.position.set(1.1, -1.05, 0.3);
+  g.add(bfR);
+
+  // Tongue: unit cylinder along local Y
+  const tongueG = new THREE.Group();
+  tongueG.position.set(0, 0.22, 0.96);
+  tongueG.visible = false;
+
+  const tongueMesh = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.035, 0.05, 1, 6), M.tongue
+  );
+  tongueG.add(tongueMesh);
+
+  const tip = new THREE.Mesh(new THREE.SphereGeometry(0.11, 10, 8), M.tongue);
+  tongueG.add(tip);
+
+  g.add(tongueG);
+
+  return { g, tongueG, tongueMesh, tip, mouth, throat, eL, eR, pL, pR, hiL, hiR };
+}
+
+// ═══════════════════════════════════════════════
+//  FROG STATE MACHINE
+// ═══════════════════════════════════════════════
+const S = { IDLE: 0, WINDUP: 1, SNAP: 2, RETRACT: 3, JUMP: 4, DIVE: 5, SWIM: 6, TURN: 7, HOP: 8 };
+
+function makeFrog(idx) {
+  const parts = buildFrog();
+  const startX = -2.5 + idx * 2.5;
+
+  const f = {
+    ...parts,
+    idx,
+    state: S.IDLE,
+    t: 0,
+    dur: 1,
+    pos: new THREE.Vector3(startX, FROG_REST_Y, 0),
+    from: new THREE.Vector3(),
+    to: new THREE.Vector3(),
+    facing: 1,
+    blinkOff: Math.random() * 5,
+    idleDur: 1.5 + Math.random() * 2.5,
+    target: null,
+    turnFrom: 0,
+    turnTo: 0,
+  };
+  parts.g.position.copy(f.pos);
+  scene.add(parts.g);
+  return f;
+}
+
+const frogs = [makeFrog(0), makeFrog(1), makeFrog(2)];
+
+// ── Spacing ──
+function frogsClear(pos, excludeIdx) {
+  for (let i = 0; i < frogs.length; i++) {
+    if (i === excludeIdx) continue;
+    if (pos.distanceTo(frogs[i].pos) < FROG_MIN_DIST) return false;
+  }
+  return true;
+}
+
+function findClearLogX(excludeIdx) {
+  for (let attempt = 0; attempt < 25; attempt++) {
+    const x = -LOG_HALF + 1.0 + Math.random() * (LOG_HALF * 2 - 2.0);
+    const test = new THREE.Vector3(x, FROG_REST_Y, 0);
+    if (frogsClear(test, excludeIdx)) return x;
+  }
+  const slots = [-3, 0, 3];
+  for (const s of slots) {
+    const test = new THREE.Vector3(s, FROG_REST_Y, 0);
+    if (frogsClear(test, excludeIdx)) return s;
+  }
+  return -3 + excludeIdx * 3;
+}
+
+function findClearSwimTarget(excludeIdx, biasX) {
+  for (let attempt = 0; attempt < 20; attempt++) {
+    const x = THREE.MathUtils.clamp(biasX + (Math.random() - 0.5) * 8, -10, 10);
+    const z = 3 + Math.random() * 8;
+    const test = new THREE.Vector3(x, SWIM_Y, z);
+    if (frogsClear(test, excludeIdx)) return new THREE.Vector3(x, SWIM_Y, z);
+  }
+  return new THREE.Vector3(excludeIdx * 3, SWIM_Y, 5);
+}
+
+// ── Soft separation between frogs ──
+function applySeparation(dt) {
+  for (let i = 0; i < frogs.length; i++) {
+    for (let j = i + 1; j < frogs.length; j++) {
+      const a = frogs[i], b = frogs[j];
+      const delta = a.pos.clone().sub(b.pos);
+      const dist = delta.length();
+      if (dist < FROG_MIN_DIST && dist > 0.01) {
+        const push = delta.normalize().multiplyScalar((FROG_MIN_DIST - dist) * SEP_STRENGTH * dt);
+        if (a.state === S.IDLE && b.state === S.IDLE) {
+          a.pos.add(push);
+          b.pos.sub(push);
+          a.pos.x = THREE.MathUtils.clamp(a.pos.x, -LOG_HALF + 0.6, LOG_HALF - 0.6);
+          b.pos.x = THREE.MathUtils.clamp(b.pos.x, -LOG_HALF + 0.6, LOG_HALF - 0.6);
+          a.pos.z = 0;
+          b.pos.z = 0;
+          a.pos.y = FROG_REST_Y;
+          b.pos.y = FROG_REST_Y;
+          a.g.position.copy(a.pos);
+          b.g.position.copy(b.pos);
+        } else if (a.state === S.IDLE) {
+          a.pos.add(push);
+          a.pos.x = THREE.MathUtils.clamp(a.pos.x, -LOG_HALF + 0.6, LOG_HALF - 0.6);
+          a.pos.z = 0;
+          a.pos.y = FROG_REST_Y;
+          a.g.position.copy(a.pos);
+        } else if (b.state === S.IDLE) {
+          b.pos.sub(push);
+          b.pos.x = THREE.MathUtils.clamp(b.pos.x, -LOG_HALF + 0.6, LOG_HALF - 0.6);
+          b.pos.z = 0;
+          b.pos.y = FROG_REST_Y;
+          b.g.position.copy(b.pos);
+        }
+      }
+    }
+  }
+}
+
+// ── Tongue ──
+function aimTongue(f, targetWorldPos) {
+  const targetLocal = f.g.worldToLocal(targetWorldPos.clone());
+  const dir = targetLocal.clone().normalize();
+  const dist = targetLocal.length();
+
+  const up = new THREE.Vector3(0, 1, 0);
+  const q = new THREE.Quaternion().setFromUnitVectors(up, dir);
+  f.tongueG.quaternion.copy(q);
+
+  const len = Math.min(dist, TONGUE_MAX);
+  f.tongueMesh.scale.y = len;
+  f.tongueMesh.position.y = len / 2;
+  f.tip.position.y = len;
+}
+
+function retractTongue(f, s) {
+  if (!f.target) return;
+  const targetLocal = f.g.worldToLocal(f.target.mesh.position.clone());
+  const dist = targetLocal.length();
+  const len = Math.max(0.01, Math.min(dist, TONGUE_MAX) * s);
+  f.tongueMesh.scale.y = len;
+  f.tongueMesh.position.y = len / 2;
+  f.tip.position.y = len;
+}
+
+function setMouth(f, openness) {
+  f.mouth.scale.set(1 + openness * 0.4, 0.15 + openness * 0.85, 1);
+  f.mouth.position.y = 0.22 - openness * 0.08;
+  f.throat.scale.setScalar(0.01 + openness * 0.95);
+}
+
+// ── Pick action ──
+function pickAction(f) {
+  f.t = 0;
+  setMouth(f, 0);
+  f.tongueG.visible = false;
+  const r = Math.random();
+
+  if (r < 0.22) {
+    f.state = S.IDLE;
+    f.idleDur = 1.5 + Math.random() * 3;
+  } else if (r < 0.52) {
+    f.state = S.JUMP;
+    f.dur = 0.5 + Math.random() * 0.25;
+    f.from.copy(f.pos);
+    const dist = 1.5 + Math.random() * 2.0;
+    let newX = f.pos.x + f.facing * dist;
+    if (newX > LOG_HALF - 0.6) { f.facing = -1; newX = f.pos.x + f.facing * dist; }
+    if (newX < -LOG_HALF + 0.6) { f.facing = 1; newX = f.pos.x + f.facing * dist; }
+    newX = THREE.MathUtils.clamp(newX, -LOG_HALF + 0.6, LOG_HALF - 0.6);
+    const testPos = new THREE.Vector3(newX, FROG_REST_Y, 0);
+    f.to.set(frogsClear(testPos, f.idx) ? newX : findClearLogX(f.idx), FROG_REST_Y, 0);
+  } else if (r < 0.72) {
+    f.state = S.DIVE;
+    f.dur = 0.7 + Math.random() * 0.2;
+    f.from.copy(f.pos);
+    const tz = 3 + Math.random() * 6;
+    f.to.set(f.pos.x + (Math.random() - 0.5) * 3, SWIM_Y, tz);
+    if (!frogsClear(f.to, f.idx)) f.to = findClearSwimTarget(f.idx, f.pos.x);
+  } else {
+    f.state = S.IDLE;
+    f.idleDur = 1.0 + Math.random() * 2.5;
+  }
+}
+
+// ── Main frog update ──
+function updateFrog(f, t, dt) {
+  f.t += dt;
+  const p = f.g;
+  const prog = Math.min(f.t / f.dur, 1);
+
+  switch (f.state) {
+    case S.IDLE: {
+      p.position.set(f.pos.x, FROG_REST_Y + Math.sin(t * 3 + f.blinkOff) * 0.03, 0);
+      p.rotation.set(0, 0, 0);
+      p.scale.set(1, 1, 1);
+      setMouth(f, 0);
+      f.tongueG.visible = false;
+
+      const bc = (t + f.blinkOff) % 3.5;
+      const bs = (bc > 3.3 && bc < 3.42) ? 0.35 : 1;
+      f.eL.scale.y = f.pL.scale.y = f.hiL.scale.y = bs;
+      f.eR.scale.y = f.pR.scale.y = f.hiR.scale.y = bs;
+
+      let best = null, bestD = CATCH_RANGE;
+      const mouthWorld = new THREE.Vector3(f.pos.x, FROG_REST_Y + 0.22, 1.0);
+      for (const fly of flies) {
+        if (fly.dead) continue;
+        const d = fly.mesh.position.distanceTo(mouthWorld);
+        if (d < bestD) { bestD = d; best = fly; }
+      }
+
+      if (f.t > f.idleDur) {
+        if (best) {
+          f.state = S.WINDUP;
+          f.t = 0;
+          f.dur = 0.25;
+          f.target = best;
+        } else {
+          pickAction(f);
+        }
+      }
+      break;
+    }
+
+    case S.WINDUP: {
+      setMouth(f, prog);
+      p.position.set(f.pos.x, FROG_REST_Y - prog * 0.08, 0);
+      p.scale.set(1 + prog * 0.1, 1 - prog * 0.08, 1 + prog * 0.1);
+      p.rotation.set(0, 0, 0);
+
+      if (f.target && !f.target.dead) {
+        const dir = f.target.mesh.position.clone().sub(f.pos).normalize();
+        f.pL.position.x = -0.40 + dir.x * 0.05;
+        f.pL.position.y = 1.25 + dir.y * 0.03;
+        f.pR.position.x = 0.40 + dir.x * 0.05;
+        f.pR.position.y = 1.25 + dir.y * 0.03;
+      }
+
+      if (prog >= 1) {
+        f.state = S.SNAP;
+        f.t = 0;
+        f.dur = 0.15;
+        f.tongueG.visible = true;
+        if (f.target) aimTongue(f, f.target.mesh.position);
+      }
+      break;
+    }
+
+    case S.SNAP: {
+      setMouth(f, 1);
+      p.position.set(f.pos.x, FROG_REST_Y + 0.05, 0);
+      p.scale.set(0.92, 1.15, 0.92);
+
+      if (f.target && !f.target.dead) {
+        aimTongue(f, f.target.mesh.position);
+        if (prog >= 0.85) {
+          f.target.dead = true;
+          f.target.deadT = 0;
+        }
+      }
+
+      if (prog >= 1) {
+        f.state = S.RETRACT;
+        f.t = 0;
+        f.dur = 0.22;
+      }
+      break;
+    }
+
+    case S.RETRACT: {
+      const s = 1 - prog;
+      setMouth(f, s);
+      retractTongue(f, s);
+      p.position.set(f.pos.x, FROG_REST_Y, 0);
+      p.scale.set(1, 1, 1);
+
+      if (prog >= 1) {
+        f.tongueG.visible = false;
+        f.tongueG.quaternion.identity();
+        f.tongueMesh.scale.y = 1;
+        f.tongueMesh.position.y = 0;
+        f.tip.position.y = 0;
+        f.target = null;
+        f.pL.position.set(-0.40, 1.25, 0.92);
+        f.pR.position.set(0.40, 1.25, 0.92);
+        pickAction(f);
+      }
+      break;
+    }
+
+    case S.JUMP: {
+      // Arc along the log — stays above log surface
+      const arcH = 2.2;
+      const x = THREE.MathUtils.lerp(f.from.x, f.to.x, prog);
+      const y = FROG_REST_Y + Math.sin(prog * Math.PI) * arcH;
+      const stretch = 1 + Math.sin(prog * Math.PI) * 0.3;
+      p.scale.set(1 / Math.sqrt(stretch), stretch, 1 / Math.sqrt(stretch));
+      p.position.set(x, y, 0);
+      p.rotation.z = (f.to.x - f.from.x) * -0.04;
+      f.pos.set(x, y, 0);
+      setMouth(f, 0);
+
+      if (prog >= 1) {
+        f.pos.set(f.to.x, FROG_REST_Y, 0);
+        p.position.copy(f.pos);
+        p.rotation.z = 0;
+        p.scale.set(1.2, 0.75, 1.2);
+        pickAction(f);
+      }
+      break;
+    }
+
+    case S.DIVE: {
+      // Parabolic arc: goes UP and OVER the log, then descends into water
+      const arcH = 1.8; // extra height above the linear path
+      const x = THREE.MathUtils.lerp(f.from.x, f.to.x, prog);
+      const z = THREE.MathUtils.lerp(f.from.z, f.to.z, prog);
+      const linearY = THREE.MathUtils.lerp(f.from.y, f.to.y, prog);
+      const y = linearY + Math.sin(prog * Math.PI) * arcH;
+      p.position.set(x, y, z);
+      p.rotation.x = -prog * 0.5;
+      p.scale.set(0.9, 1.1, 0.9);
+      f.pos.set(x, y, z);
+      setMouth(f, 0);
+
+      if (prog >= 1) {
+        f.pos.set(f.to.x, SWIM_Y, f.to.z);
+        const sp = splashes.find(s => s.timer < 0);
+        if (sp) {
+          sp.timer = 0;
+          sp.mesh.position.set(f.pos.x, 0.06, f.pos.z);
+          sp.mesh.visible = true;
+        }
+        f.state = S.SWIM;
+        f.t = 0;
+        f.dur = 2.5 + Math.random() * 3;
+        f.from.copy(f.pos);
+        f.to = findClearSwimTarget(f.idx, f.pos.x + (Math.random() - 0.5) * 4);
+      }
+      break;
+    }
+
+    case S.SWIM: {
+      const ease = THREE.MathUtils.smoothstep(prog, 0, 1);
+      const x = THREE.MathUtils.lerp(f.from.x, f.to.x, ease);
+      const z = THREE.MathUtils.lerp(f.from.z, f.to.z, ease);
+      const bob = Math.sin(t * 5 + f.blinkOff) * 0.06;
+      const y = Math.max(WATER_Y + 0.1, SWIM_Y + bob);
+      p.position.set(x, y, z);
+      p.rotation.x = 0;
+      p.rotation.y = Math.sin(t * 1.5 + f.blinkOff) * 0.3;
+      p.scale.set(1, 0.8, 1);
+      f.pos.set(x, y, z);
+      setMouth(f, 0);
+
+      if (prog >= 1) {
+        f.state = S.TURN;
+        f.t = 0;
+        f.dur = 0.4;
+        f.turnFrom = p.rotation.y;
+        f.turnTo = Math.PI; // face the log (mouth toward -Z)
+        f.from.copy(f.pos);
+        const targetX = findClearLogX(f.idx);
+        f.to.set(targetX, FROG_REST_Y, 0);
+      }
+      break;
+    }
+
+    case S.TURN: {
+      const ease = THREE.MathUtils.smoothstep(prog, 0, 1);
+      p.rotation.y = THREE.MathUtils.lerp(f.turnFrom, f.turnTo, ease);
+      const bob = Math.sin(t * 6) * 0.04;
+      p.position.set(f.pos.x, Math.max(WATER_Y + 0.1, SWIM_Y + bob), f.pos.z);
+      p.scale.set(1, 0.85, 1);
+      setMouth(f, 0);
+
+      if (prog >= 1) {
+        f.state = S.HOP;
+        f.t = 0;
+        f.dur = 0.6;
+        f.from.copy(f.pos);
+      }
+      break;
+    }
+
+    case S.HOP: {
+      // Arc from water UP onto the log — lands on top surface
+      const arcH = 2.0;
+      const x = THREE.MathUtils.lerp(f.from.x, f.to.x, prog);
+      const z = THREE.MathUtils.lerp(f.from.z, f.to.z, prog);
+      const linearY = THREE.MathUtils.lerp(f.from.y, f.to.y, prog);
+      const y = linearY + Math.sin(prog * Math.PI) * arcH;
+      const stretch = 1 + Math.sin(prog * Math.PI) * 0.25;
+      p.position.set(x, y, z);
+      p.scale.set(1 / Math.sqrt(stretch), stretch, 1 / Math.sqrt(stretch));
+      p.rotation.set(0, Math.PI, 0);
+      f.pos.set(x, y, z);
+      setMouth(f, 0);
+
+      if (prog >= 1) {
+        f.pos.set(f.to.x, FROG_REST_Y, 0);
+        p.position.copy(f.pos);
+        p.rotation.set(0, 0, 0);
+        p.scale.set(1.2, 0.75, 1.2);
+        pickAction(f);
+      }
+      break;
+    }
+  }
+}
+
+// ═══════════════════════════════════════════════
+//  INSECTS
+// ═══════════════════════════════════════════════
+let flockPoint = null, flockTimer = 0, flockActive = false, flockEnd = 0;
+const FLOCK_INTERVAL = 9;
+
+function updateFlock(dt, t) {
+  flockTimer += dt;
+  if (flockTimer > FLOCK_INTERVAL) {
+    flockTimer = 0;
+    flockPoint = new THREE.Vector3(
+      (Math.random() - 0.5) * 20,
+      3 + Math.random() * 7,
+      (Math.random() - 0.5) * 12 + 4
+    );
+    flockActive = true;
+    flockEnd = t + 3 + Math.random() * 3;
+  }
+  if (flockActive && t > flockEnd) { flockActive = false; flockPoint = null; }
+}
+
+const flies = Array.from({ length: 14 }, () => {
+  const g = new THREE.Group();
+  g.add(new THREE.Mesh(new THREE.SphereGeometry(0.1, 10, 8), M.fly));
+  const wG = new THREE.SphereGeometry(0.07, 4, 3);
+  const w1 = new THREE.Mesh(wG, M.wing);
+  const w2 = new THREE.Mesh(wG, M.wing);
+  w1.position.set(0.07, 0.05, 0);
+  w2.position.set(-0.07, 0.05, 0);
+  g.add(w1);
+  g.add(w2);
+  scene.add(g);
+
+  const pos = new THREE.Vector3(
+    (Math.random() - 0.5) * 24,
+    2 + Math.random() * 8,
+    -4 + Math.random() * 18
+  );
+  g.position.copy(pos);
+
+  return {
+    mesh: g, w: [w1, w2], pos,
+    vel: new THREE.Vector3((Math.random()-0.5)*2, (Math.random()-0.5), (Math.random()-0.5)*2),
+    dead: false, deadT: 0,
+    wanderSeed: Math.random() * 100,
+    flockWeight: 0.4 + Math.random() * 0.6,
+  };
+});
+
+function updateFlies(t, dt) {
+  for (const fly of flies) {
+    if (fly.dead) {
+      fly.deadT += dt;
+      fly.mesh.scale.setScalar(Math.max(0.01, 1 - fly.deadT * 2.5));
+      if (fly.deadT > 3) {
+        fly.dead = false; fly.deadT = 0;
+        fly.pos.set((Math.random()-0.5)*24, 2+Math.random()*8, -4+Math.random()*18);
+        fly.vel.set((Math.random()-0.5)*2, (Math.random()-0.5), (Math.random()-0.5)*2);
+      }
+      continue;
+    }
+    fly.mesh.scale.setScalar(1);
+    const s = fly.wanderSeed;
+    fly.vel.x += (Math.sin(t*0.7+s)*1.2 + (Math.random()-0.5)*4) * dt;
+    fly.vel.y += (Math.sin(t*0.5+s*1.3)*0.6 + (Math.random()-0.5)*2) * dt;
+    fly.vel.z += (Math.cos(t*0.6+s*0.7)*1.2 + (Math.random()-0.5)*4) * dt;
+
+    if (flockActive && flockPoint) {
+      fly.vel.addScaledVector(flockPoint.clone().sub(fly.pos).normalize(), dt * 2.5 * fly.flockWeight);
+    }
+
+    fly.vel.multiplyScalar(1 - dt * 1.2);
+    const spd = fly.vel.length();
+    if (spd > 3.5) fly.vel.multiplyScalar(3.5 / spd);
+    fly.pos.addScaledVector(fly.vel, dt);
+
+    if (fly.pos.x < -14) fly.vel.x += dt * 6;
+    if (fly.pos.x > 14) fly.vel.x -= dt * 6;
+    if (fly.pos.y < 1.5) fly.vel.y += dt * 6;
+    if (fly.pos.y > 12) fly.vel.y -= dt * 6;
+    if (fly.pos.z < -5) fly.vel.z += dt * 6;
+    if (fly.pos.z > 18) fly.vel.z -= dt * 6;
+
+    fly.mesh.position.copy(fly.pos);
+    fly.mesh.rotation.y = Math.atan2(fly.vel.x, fly.vel.z);
+    const flap = Math.sin(t * 28 + fly.wanderSeed) * 0.6;
+    fly.w[0].rotation.y = flap;
+    fly.w[1].rotation.y = -flap;
+  }
+}
+
+const fireflies = Array.from({ length: 14 }, () => {
+  const g = new THREE.Group();
+  const core = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 6), M.fire);
+  const glow = new THREE.Mesh(new THREE.SphereGeometry(0.16, 8, 6), M.fireG.clone());
+  g.add(core); g.add(glow);
+  const bx = (Math.random()-0.5)*36, by = 0.5+Math.random()*8, bz = -6+Math.random()*20;
+  g.position.set(bx, by, bz);
+  scene.add(g);
+  return { mesh: g, glow, bx, by, bz, sp: 0.1+Math.random()*0.4, ph: Math.random()*Math.PI*2, pulse: 1.5+Math.random()*4 };
+});
+
+const moths = Array.from({ length: 5 }, () => {
+  const g = new THREE.Group();
+  g.add(new THREE.Mesh(new THREE.CapsuleGeometry(0.08, 0.2, 4, 6), M.moth));
+  const wG = new THREE.SphereGeometry(0.2, 6, 4);
+  const wL = new THREE.Mesh(wG, M.mothW);
+  const wR = new THREE.Mesh(wG, M.mothW);
+  wL.position.set(-0.2, 0, 0); wL.scale.set(1, 1.4, 0.25);
+  wR.position.set(0.2, 0, 0); wR.scale.set(1, 1.4, 0.25);
+  g.add(wL); g.add(wR);
+  scene.add(g);
+  return { mesh: g, w: [wL, wR], bx: (Math.random()-0.5)*28, by: 3+Math.random()*7, bz: -4+Math.random()*16, sp: 0.15+Math.random()*0.3, ph: Math.random()*Math.PI*2, wob: 0.3+Math.random()*1.5 };
+});
+
+const bflyG = new THREE.Group();
+const bWG = new THREE.SphereGeometry(0.14, 8, 6);
+const bW1 = new THREE.Mesh(bWG, M.bfly);
+const bW2 = new THREE.Mesh(bWG, M.bfly);
+bW1.position.set(-0.14, 0, 0); bW1.scale.set(1, 1.4, 0.25);
+bW2.position.set(0.14, 0, 0); bW2.scale.set(1, 1.4, 0.25);
+bflyG.add(bW1); bflyG.add(bW2);
+scene.add(bflyG);
+
+// ═══════════════════════════════════════════════
+//  MAIN LOOP
+// ═══════════════════════════════════════════════
+let lastTime = 0;
+let rainIntensity = 0;
+
+function loop(now) {
+  requestAnimationFrame(loop);
+  const t = now * 0.001;
+  const dt = Math.min(t - lastTime, 0.05);
+  lastTime = t;
+
+  // Rain
+  rainTimer += dt;
+  if (rainTimer > RAIN_CYCLE) { rainTimer = 0; raining = !raining; }
+  rainIntensity += ((raining ? 1 : 0) - rainIntensity) * dt * 2;
+  const activeDrops = Math.floor(RAIN_COUNT * rainIntensity);
+  for (let i = 0; i < RAIN_COUNT; i++) {
+    const drop = rainMeshes[i];
+    if (i < activeDrops) {
+      drop.visible = true;
+      drop.position.y -= 22 * dt;
+      if (drop.position.y < 0) {
+        drop.position.y = 25 + Math.random() * 10;
+        drop.position.x = (Math.random() - 0.5) * 50;
+        drop.position.z = (Math.random() - 0.5) * 30;
+      }
+    } else {
+      drop.visible = false;
+    }
+  }
+
+  // Water
+  const wp = wGeo.attributes.position;
+  for (let i = 0; i < wp.count; i++) {
+    const x = wp.getX(i), y = wp.getY(i);
+    const amp = 0.08 + rainIntensity * 0.08;
+    wp.setZ(i, Math.sin(x*0.3 + t*0.6)*amp + Math.cos(y*0.25 + t*0.4)*amp*0.7);
+  }
+  wp.needsUpdate = true;
+  wGeo.computeVertexNormals();
+
+  // Frogs
+  for (const f of frogs) {
+    updateFrog(f, t, dt);
+    // HARD collision: frog cannot be inside the log
+    resolveLogCollision(f);
+    // Sync visual position
+    f.g.position.copy(f.pos);
+  }
+  applySeparation(dt);
+
+  // Insects
+  updateFlock(dt, t);
+  updateFlies(t, dt);
+
+  for (const ff of fireflies) {
+    ff.mesh.position.set(
+      ff.bx + Math.sin(t*ff.sp+ff.ph)*4,
+      ff.by + Math.sin(t*0.4+ff.ph)*1.2,
+      ff.bz + Math.cos(t*ff.sp*0.7+ff.ph)*3
+    );
+    const pulse = 0.5 + Math.sin(t*ff.pulse+ff.ph)*0.5;
+    ff.glow.scale.setScalar(0.3 + pulse);
+    ff.glow.material.opacity = 0.06 + pulse*0.25;
+  }
+
+  for (const m of moths) {
+    m.mesh.position.set(
+      m.bx + Math.cos(t*m.sp+m.ph)*5 + Math.sin(t*m.wob+m.ph)*1.5,
+      m.by + Math.sin(t+m.ph)*1.5,
+      m.bz + Math.sin(t*m.sp*0.8+m.ph)*4
+    );
+    m.mesh.rotation.y = t*m.sp + m.ph + Math.PI/2;
+    const flap = Math.sin(t*5+m.ph)*0.4;
+    m.w[0].rotation.y = flap;
+    m.w[1].rotation.y = -flap;
+  }
+
+  bflyG.position.set(5+Math.sin(t*0.4)*10, 8+Math.sin(t*0.9)*3, 3+Math.cos(t*0.3)*8);
+  bflyG.rotation.y = Math.sin(t*0.4)*0.8;
+  const bflap = Math.sin(t*16)*0.5;
+  bW1.scale.y = 1+bflap;
+  bW2.scale.y = 1+bflap;
+
+  for (const c of clouds) {
+    c.group.position.x += c.speed * dt;
+    if (c.group.position.x > 40) c.group.position.x = -40;
+  }
+
+  for (let i = 0; i < grass.length; i++) {
+    grass[i].rotation.z = Math.sin(t*1.5+i*0.8)*0.08 + rainIntensity*Math.sin(t*8+i)*0.1;
+  }
+
+  for (let i = 0; i < lilies.length; i++) {
+    lilies[i].position.y = 0.03 + Math.sin(t*0.8+i*1.3)*0.04;
+  }
+
+  for (const fl of flowers) {
+    fl.petal.position.y = fl.baseY + Math.sin(t*1.3)*0.03;
+    fl.center.position.y = fl.baseY + 0.06 + Math.sin(t*1.3)*0.03;
+  }
+
+  for (let i = 0; i < ripples.length; i++) {
+    const p = (t*0.35 + i*0.4) % 2.5;
+    ripples[i].scale.setScalar(1 + p*2);
+    ripples[i].material.opacity = Math.max(0, 0.3*(1 - p/2.5));
+  }
+
+  for (const sp of splashes) {
+    if (sp.timer < 0) continue;
+    sp.timer += dt;
+    const p = sp.timer / sp.maxT;
+    if (p >= 1) { sp.timer = -1; sp.mesh.visible = false; continue; }
+    sp.mesh.visible = true;
+    sp.mesh.scale.setScalar(1 + p*5);
+    sp.mesh.material.opacity = 0.4*(1-p);
+  }
+
+  moonG.children[1].material.opacity = 0.10 + Math.sin(t*0.3)*0.04;
+
+  cam.position.x = Math.sin(t*0.04)*2;
+  cam.position.y = 4.5 + Math.sin(t*0.06)*0.5;
+  cam.lookAt(0, 2, 0);
+
+  renderer.render(scene, cam);
+}
+
+requestAnimationFrame(loop);
+
+addEventListener("resize", () => {
+  cam.aspect = innerWidth / innerHeight;
+  cam.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+</script>
+</body>
+</html>
