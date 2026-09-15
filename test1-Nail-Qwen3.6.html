@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tortoise in the Forest</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #f0f4f8;
+            font-family: sans-serif;
+            overflow: hidden;
+        }
+        
+        .scene-container {
+            width: 100%;
+            max-width: 800px;
+            height: auto;
+            aspect-ratio: 16/9;
+            background: linear-gradient(to bottom, #87CEEB 0%, #E0F7FA 60%, #4CAF50 60%, #2E7D32 100%);
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* Sun */
+        .sun {
+            position: absolute;
+            top: 40px;
+            right: 60px;
+            width: 60px;
+            height: 60px;
+            background: #FFD700;
+            border-radius: 50%;
+            box-shadow: 0 0 40px #FFD700, 0 0 80px #FFA500;
+            animation: pulseSun 4s infinite alternate ease-in-out;
+        }
+
+        @keyframes pulseSun {
+            0% { transform: scale(1); box-shadow: 0 0 40px #FFD700, 0 0 80px #FFA500; }
+            100% { transform: scale(1.1); box-shadow: 0 0 50px #FFD700, 0 0 100px #FFA500; }
+        }
+
+        /* Mountains */
+        .mountains {
+            position: absolute;
+            bottom: 40%; /* Horizon line roughly */
+            width: 100%;
+            height: 200px;
+            z-index: 1;
+        }
+
+        .mountain {
+            position: absolute;
+            bottom: 0;
+            width: 0;
+            height: 0;
+            border-left: solid transparent;
+            border-right: solid transparent;
+            border-bottom: solid;
+        }
+
+        .m1 {
+            left: -10%;
+            border-width: 0 150px 180px 150px;
+            border-bottom-color: #5C6BC0;
+            opacity: 0.8;
+        }
+        .m2 {
+            left: 20%;
+            border-width: 0 200px 220px 200px;
+            border-bottom-color: #3949AB;
+            z-index: 2;
+        }
+        .m3 {
+            right: -10%;
+            border-width: 0 180px 160px 180px;
+            border-bottom-color: #7986CB;
+        }
+
+        /* Clouds */
+        .cloud {
+            position: absolute;
+            background: #fff;
+            border-radius: 50px;
+            opacity: 0.9;
+            animation: floatCloud linear infinite;
+        }
+
+        .cloud::after, .cloud::before {
+            content: '';
+            position: absolute;
+            background: #fff;
+            border-radius: 50%;
+        }
+
+        .c1 { width: 100px; height: 40px; top: 80px; left: -120px; animation-duration: 25s; }
+        .c1::after { width: 50px; height: 50px; top: -25px; left: 15px; }
+        .c1::before { width: 40px; height: 40px; top: -15px; left: 50px; }
+
+        .c2 { width: 140px; height: 50px; top: 120px; left: -180px; animation-duration: 35s; animation-delay: 5s; }
+        .c2::after { width: 60px; height: 60px; top: -30px; left: 25px; }
+        .c2::before { width: 50px; height: 50px; top: -20px; left: 70px; }
+
+        .c3 { width: 80px; height: 30px; top: 60px; left: -100px; animation-duration: 20s; animation-delay: 12s; }
+        .c3::after { width: 40px; height: 40px; top: -20px; left: 10px; }
+
+        @keyframes floatCloud {
+            from { transform: translateX(-200px); }
+            to { transform: translateX(900px); }
+        }
+
+        /* Forest */
+        .forest {
+            position: absolute;
+            bottom: 40%;
+            width: 100%;
+            height: 150px;
+            z-index: 1;
+        }
+
+        .tree {
+            position: absolute;
+            bottom: 0;
+        }
+
+        .trunk {
+            width: 20px;
+            height: 40px;
+            background: #5D4037;
+            margin: 0 auto;
+        }
+
+        .leaves {
+            width: 60px;
+            height: 70px;
+            background: #2E7D32;
+            border-radius: 50% 50% 10% 10%;
+            margin: 0 auto;
+            margin-bottom: -10px;
+            box-shadow: inset -5px -5px 10px rgba(0,0,0,0.1);
+        }
+
+        .tree:nth-child(1) { left: 5%; transform: scale(0.8); }
+        .tree:nth-child(2) { left: 15%; transform: scale(1.2); }
+        .tree:nth-child(3) { left: 30%; transform: scale(0.9); }
+        .tree:nth-child(4) { left: 70%; transform: scale(1.1); }
+        .tree:nth-child(5) { left: 85%; transform: scale(0.7); }
+        .tree:nth-child(6) { left: 95%; transform: scale(1); }
+
+        /* Road */
+        .road {
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            height: 120px;
+            background: #795548;
+            z-index: 10;
+            border-top: 4px solid #5D4037;
+        }
+
+        .road::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: repeating-linear-gradient(90deg, #FFEB3B 0, #FFEB3B 40px, transparent 40px, transparent 80px);
+            opacity: 0.6;
+        }
+
+        /* Grass Tufts */
+        .grass {
+            position: absolute;
+            bottom: 118px;
+            width: 100%;
+            height: 20px;
+            z-index: 11;
+        }
+        .blade {
+            position: absolute;
+            background: #388E3C;
+            border-radius: 0 50% 0 50%;
+            transform-origin: bottom center;
+            animation: sway 3s infinite ease-in-out;
+        }
+        
+        @keyframes sway {
+            0%, 100% { transform: rotate(-5deg); }
+            50% { transform: rotate(5deg); }
+        }
+
+        /* Tortoise Group */
+        .tortoise-container {
+            position: absolute;
+            bottom: 40px;
+            left: -100px;
+            z-index: 20;
+            animation: walkAcross 20s linear infinite;
+        }
+
+        @keyframes walkAcross {
+            0% { left: -120px; }
+            100% { left: 900px; }
+        }
+
+        .tortoise {
+            width: 100px;
+            height: 60px;
+            position: relative;
+            animation: bob 1.5s infinite ease-in-out;
+        }
+
+        @keyframes bob {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-2px); }
+        }
+
+        /* Tortoise Parts */
+        .leg {
+            position: absolute;
+            width: 20px;
+            height: 25px;
+            background: #8D6E63;
+            border-radius: 10px;
+            z-index: 5;
+        }
+
+        .leg-fl { bottom: 0; left: 15px; transform-origin: top center; animation: walkLeg 1.5s infinite ease-in-out; }
+        .leg-fr { bottom: 0; left: 35px; transform-origin: top center; animation: walkLeg 1.5s infinite ease-in-out 0.75s; }
+        .leg-bl { bottom: 0; left: 60px; transform-origin: top center; animation: walkLeg 1.5s infinite ease-in-out 0.3s; }
+        .leg-br { bottom: 0; left: 80px; transform-origin: top center; animation: walkLeg 1.5s infinite ease-in-out 1.05s; }
+
+        @keyframes walkLeg {
+            0% { transform: rotate(-15deg); }
+            50% { transform: rotate(15deg); }
+            100% { transform: rotate(-15deg); }
+        }
+
+        .shell {
+            position: absolute;
+            bottom: 15px;
+            left: 10px;
+            width: 70px;
+            height: 45px;
+            background: radial-gradient(circle at 30% 30%, #8D6E63, #5D4037);
+            border-radius: 50% 50% 40% 40%;
+            z-index: 10;
+            border: 2px solid #3E2723;
+            box-shadow: inset 0 -5px 10px rgba(0,0,0,0.3);
+        }
+
+        /* Shell Pattern */
+        .shell-pattern {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            width: 50px;
+            height: 25px;
+            border: 2px solid #4E342E;
+            border-radius: 50%;
+            opacity: 0.5;
+        }
+        .shell-pattern::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 30px;
+            height: 15px;
+            border: 2px solid #4E342E;
+            border-radius: 50%;
+        }
+
+        .head {
+            position: absolute;
+            bottom: 18px;
+            right: -5px;
+            width: 25px;
+            height: 20px;
+            background: #8D6E63;
+            border-radius: 50% 50% 20% 20%;
+            z-index: 12;
+            animation: headBob 1.5s infinite ease-in-out;
+        }
+
+        .eye {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            width: 4px;
+            height: 4px;
+            background: #000;
+            border-radius: 50%;
+        }
+
+        .eye::after {
+            content: '';
+            position: absolute;
+            top: 1px;
+            right: 0px;
+            width: 1.5px;
+            height: 1.5px;
+            background: #fff;
+            border-radius: 50%;
+        }
+
+        @keyframes headBob {
+            0%, 100% { transform: translateX(0) rotate(0deg); }
+            25% { transform: translateX(-2px) rotate(-2deg); }
+            75% { transform: translateX(1px) rotate(1deg); }
+        }
+
+        .tail {
+            position: absolute;
+            bottom: 18px;
+            left: -5px;
+            width: 10px;
+            height: 6px;
+            background: #8D6E63;
+            border-radius: 50%;
+            z-index: 5;
+        }
+
+        /* Flowers */
+        .flower {
+            position: absolute;
+            z-index: 12;
+        }
+        .stem {
+            width: 2px;
+            height: 15px;
+            background: #388E3C;
+            margin: 0 auto;
+        }
+        .petals {
+            width: 10px;
+            height: 10px;
+            background: #FF4081;
+            border-radius: 50%;
+            margin: 0 auto;
+            position: relative;
+        }
+        .petals::before, .petals::after {
+            content: '';
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background: #FF4081;
+            border-radius: 50%;
+        }
+        .petals::before { top: -5px; left: 0; }
+        .petals::after { top: 0; left: -5px; }
+
+        .f1 { bottom: 125px; left: 20%; }
+        .f2 { bottom: 130px; right: 15%; }
+        .f3 { bottom: 128px; left: 60%; }
+
+    </style>
+</head>
+<body>
+    <div class="scene-container">
+        <!-- Sun -->
+        <div class="sun"></div>
+
+        <!-- Clouds -->
+        <div class="cloud c1"></div>
+        <div class="cloud c2"></div>
+        <div class="cloud c3"></div>
+
+        <!-- Mountains -->
+        <div class="mountains">
+            <div class="mountain m1"></div>
+            <div class="mountain m2"></div>
+            <div class="mountain m3"></div>
+        </div>
+
+        <!-- Forest -->
+        <div class="forest">
+            <div class="tree"><div class="leaves"></div><div class="trunk"></div></div>
+            <div class="tree"><div class="leaves"></div><div class="trunk"></div></div>
+            <div class="tree"><div class="leaves"></div><div class="trunk"></div></div>
+            <div class="tree"><div class="leaves"></div><div class="trunk"></div></div>
+            <div class="tree"><div class="leaves"></div><div class="trunk"></div></div>
+            <div class="tree"><div class="leaves"></div><div class="trunk"></div></div>
+        </div>
+
+        <!-- Road -->
+        <div class="road"></div>
+
+        <!-- Grass -->
+        <div class="grass">
+            <div class="blade" style="left: 10%; height: 10px; animation-delay: 0s;"></div>
+            <div class="blade" style="left: 15%; height: 12px; animation-delay: 0.2s;"></div>
+            <div class="blade" style="left: 40%; height: 8px; animation-delay: 0.5s;"></div>
+            <div class="blade" style="left: 65%; height: 11px; animation-delay: 0.1s;"></div>
+            <div class="blade" style="left: 80%; height: 9px; animation-delay: 0.4s;"></div>
+            <div class="blade" style="left: 90%; height: 10px; animation-delay: 0.3s;"></div>
+        </div>
+
+        <!-- Flowers -->
+        <div class="flower f1"><div class="petals"></div><div class="stem"></div></div>
+        <div class="flower f2"><div class="petals"></div><div class="stem"></div></div>
+        <div class="flower f3"><div class="petals"></div><div class="stem"></div></div>
+
+        <!-- Tortoise -->
+        <div class="tortoise-container">
+            <div class="tortoise">
+                <div class="leg leg-bl"></div>
+                <div class="leg leg-br"></div>
+                <div class="leg leg-fl"></div>
+                <div class="leg leg-fr"></div>
+                <div class="shell">
+                    <div class="shell-pattern"></div>
+                </div>
+                <div class="head">
+                    <div class="eye"></div>
+                </div>
+                <div class="tail"></div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
