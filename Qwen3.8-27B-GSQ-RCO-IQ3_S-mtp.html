@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tortoise Forest Walk — WebGL</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; overflow: hidden; background: #0d1b2a; }
+  #c { position: fixed; inset: 0; display: block; width: 100%; height: 100%; }
+  #label {
+    position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%);
+    font-family: system-ui, sans-serif; color: #eaf4ff; font-size: 14px; letter-spacing: 2px;
+    text-transform: uppercase; opacity: .7; pointer-events: none; text-shadow: 0 1px 6px rgba(0,0,0,.6);
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="label">Tortoise · Forest Road</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.161.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.161.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+/* =========================================================
+   Renderer / Scene / Camera
+   ========================================================= */
+const canvas = document.getElementById('c');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.15;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.Fog(0xbfe3f0, 14, 90);
+
+const camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, 0.1, 200);
+camera.position.set(-9, 4.6, 13);
+
+const controls = new OrbitControls(camera, canvas);
+controls.enableDamping = true;
+controls.dampingFactor = 0.06;
+controls.target.set(0, 1.3, 0);
+controls.minDistance = 7;
+controls.maxDistance = 30;
+controls.maxPolarAngle = Math.PI * 0.49;
+controls.autoRotate = true;
+controls.autoRotateSpeed = 0.4;
+
+/* =========================================================
+   Lighting + Sky gradient
+   ========================================================= */
+scene.add(new THREE.HemisphereLight(0xcfe8ff, 0x5c8a4a, 0.9));
+
+const dir = new THREE.DirectionalLight(0xfff3d6, 2.1);
+dir.position.set(14, 20, 10);
+dir.castShadow = true;
+dir.shadow.mapSize.set(2048, 2048);
+dir.shadow.camera.near = 1; dir.shadow.camera.far = 60;
+dir.shadow.camera.left = -30; dir.shadow.camera.right = 30;
+dir.shadow.camera.top = 30; dir.shadow.camera.bottom = -30;
+dir.shadow.bias = -0.0005;
+scene.add(dir);
+
+function makeSky() {
+  const g = new THREE.Group();
+  const geo = new THREE.SphereGeometry(90, 32, 16);
+  const mat = new THREE.ShaderMaterial({
+    side: THREE.BackSide,
+    uniforms: { top: { value: new THREE.Color(0x2f6fb0) },
+                mid: { value: new THREE.Color(0xbfe3f0) },
+                bot: { value: new THREE.Color(0xd7efc8) } },
+    vertexShader: `
+      varying vec3 vP;
+      void main(){ vP = position; gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
+    fragmentShader: `
+      uniform vec3 top, mid, bot; varying vec3 vP;
+      void main(){
+        float h = normalize(vP).y*0.5 + 0.5;
+        vec3 c = h<0.5 ? mix(bot, mid, h/0.5) : mix(mid, top, (h-0.5)/0.5);
+        gl_FragColor = vec4(c, 1.0);
+      }`
+  });
+  g.add(new THREE.Mesh(geo, mat));
+
+  const sun = new THREE.Mesh(new THREE.SphereGeometry(3.2, 32, 16),
+    new THREE.MeshBasicMaterial({ color: 0xfff2b0 }));
+  sun.position.set(34, 40, -55); g.add(sun);
+
+  const halo = new THREE.Sprite(new THREE.SpriteMaterial({
+    color: 0xfff0a8, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending }));
+  halo.scale.setScalar(22); halo.position.copy(sun.position); g.add(halo);
+  return g;
+}
+scene.add(makeSky());
+
+/* =========================================================
+   Materials
+   ========================================================= */
+const shellMat = new THREE.MeshStandardMaterial({ color: 0x5a6e30, roughness: 0.85, metalness: 0.02 });
+const scuteMat = new THREE.MeshStandardMaterial({ color: 0x7d9245, roughness: 0.75, metalness: 0.05 });
+const skinMat  = new THREE.MeshStandardMaterial({ color: 0x8aa05c, roughness: 0.9, metalness: 0.0 });
+const footMat  = new THREE.MeshStandardMaterial({ color: 0x70874a, roughness: 0.95 });
+const eyeMat   = new THREE.MeshStandardMaterial({ color: 0x15210f, roughness: 0.3 });
+const pupilMat = new THREE.MeshStandardMaterial({ color: 0x000000, roughness: 0.2 });
+const leafMat  = new THREE.MeshStandardMaterial({ color: 0x2f6430, roughness: 0.9, flatShading: true });
+const leafMat2 = new THREE.MeshStandardMaterial({ color: 0x3f7a3a, roughness: 0.9, flatShading: true });
+const barkMat  = new THREE.MeshStandardMaterial({ color: 0x6a4a2c, roughness: 1.0 });
+const trunkMat = new THREE.MeshStandardMaterial({ color: 0x5a4028, roughness: 1.0 });
+const mtFar    = new THREE.MeshStandardMaterial({ color: 0x6f86a0, roughness: 1.0, flatShading: true });
+const mtNear   = new THREE.MeshStandardMaterial({ color: 0x7aa06a, roughness: 1.0, flatShading: true });
+
+/* =========================================================
+   Ground + Road
+   ========================================================= */
+function ground() {
+  const g = new THREE.Group();
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(300, 300),
+    new THREE.MeshStandardMaterial({ color: 0x5c9a3a, roughness: 1.0 }));
+  ground.rotation.x = -Math.PI / 2;
+  ground.receiveShadow = true;
+  g.add(ground);
+
+  const road = new THREE.Mesh(new THREE.PlaneGeometry(300, 6.5),
+    new THREE.MeshStandardMaterial({ color: 0xb49a6a, roughness: 1.0 }));
+  road.rotation.x = -Math.PI / 2;
+  road.position.y = 0.02;
+  road.receiveShadow = true;
+  g.add(road);
+
+  const edge = new THREE.Mesh(new THREE.BoxGeometry(300, 0.08, 0.5),
+    new THREE.MeshStandardMaterial({ color: 0x8a7548, roughness: 1.0 }));
+  edge.position.set(0, 0.04, 3.4);
+  g.add(edge);
+  const edge2 = edge.clone(); edge2.position.z = -3.4; g.add(edge2);
+
+  // scattered stones
+  const stoneGeo = new THREE.DodecahedronGeometry(0.4, 0);
+  const stoneMat = new THREE.MeshStandardMaterial({ color: 0x9a8a6a, roughness: 1.0, flatShading: true });
+  for (let i = 0; i < 14; i++) {
+    const s = new THREE.Mesh(stoneGeo, stoneMat);
+    s.position.set((Math.random()-0.5)*40, 0.2, (Math.random()-0.5)*6 + 6);
+    s.scale.setScalar(0.3 + Math.random()*0.6);
+    s.castShadow = true;
+    g.add(s);
+  }
+  return g;
+}
+scene.add(ground());
+
+/* =========================================================
+   Trees + Grass (instanced)
+   ========================================================= */
+function scatterOnGround(n, spread, mat, geo, hMin, hMax) {
+  const inst = new THREE.InstancedMesh(geo, mat, n);
+  const m = new THREE.Matrix4();
+  for (let i = 0; i < n; i++) {
+    const x = (Math.random()-0.5)*spread;
+    const z = (Math.random()-0.5)*spread;
+    if (Math.abs(x) < 4.5) { i--; continue; }        // keep road clear
+    const y = hMin + Math.random()*(hMax-hMin);
+    m.makeTranslation(x, y, z);
+    const rot = Math.random()*Math.PI;
+    m.multiply(new THREE.Matrix4().makeRotationZ(Math.random()*0.4-0.2));
+    inst.setMatrixAt(i, m);
+  }
+  inst.instanceMatrix.needsUpdate = true;
+  return inst;
+}
+
+// Trees (trunk + cone foliage) — instanced
+const treeN = 40;
+const trunkInst = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.25,0.35,2,8), trunkMat, treeN);
+const fol1Inst  = new THREE.InstancedMesh(new THREE.ConeGeometry(1.6,3.5,8), leafMat,  treeN);
+const fol2Inst  = new THREE.InstancedMesh(new THREE.ConeGeometry(1.3,3.0,8), leafMat2, treeN);
+const m = new THREE.Matrix4();
+for (let i = 0; i < treeN; i++) {
+  let x, z, tries = 0;
+  do { x = (Math.random()-0.5)*70; z = (Math.random()-0.5)*70; tries++; }
+  while (Math.abs(x) < 6 || (Math.abs(z) > 4 && Math.abs(z) < 10) && tries < 20);
+  const scale = 0.7 + Math.random()*0.8;
+  const base = new THREE.Vector3(x, 0, z);
+  const mk = (off, sc) => { const mm = m.clone().compose(base.clone().add(new THREE.Vector3(0,off,0)),
+    new THREE.Quaternion(), new THREE.Vector3().setScalar(sc)); return mm; };
+  trunkInst.setMatrixAt(i, mk(1, scale));
+  fol1Inst.setMatrixAt(i, mk(2.8, scale));
+  fol2Inst.setMatrixAt(i, mk(4.0, scale*0.85));
+  trunkInst.instanceMatrix.needsUpdate = fol1Inst.instanceMatrix.needsUpdate = fol2Inst.instanceMatrix.needsUpdate = true;
+}
+trunkInst.castShadow = fol1Inst.castShadow = fol2Inst.castShadow = true;
+scene.add(trunkInst, fol1Inst, fol2Inst);
+
+// Grass tufts (instanced, swaying via shader-free scale pulse)
+const grassN = 400;
+const grass = new THREE.InstancedMesh(new THREE.ConeGeometry(0.15, 0.8, 5),
+  new THREE.MeshStandardMaterial({ color: 0x6aa84a, roughness: 1.0 }), grassN);
+const gM = new THREE.Matrix4();
+for (let i = 0; i < grassN; i++) {
+  const x = (Math.random()-0.5)*80, z = (Math.random()-0.5)*80;
+  if (Math.abs(x) < 4.5) continue;
+  const s = 0.6 + Math.random()*1.0;
+  gM.makeTranslation(x, 0.3*s, z);
+  grass.setMatrixAt(i, gM);
+}
+grass.instanceMatrix.needsUpdate = true;
+scene.add(grass);
+
+/* =========================================================
+   Mountains (jagged rings)
+   ========================================================= */
+function makeMountains(radius, height, color, seed) {
+  const pts = [];
+  const n = 26;
+  for (let i = 0; i < n; i++) {
+    const a = (i/n)*Math.PI*2;
+    const r = radius + Math.sin(a*3 + seed)*8 + Math.cos(a*5 + seed)*4;
+    pts.push(new THREE.Vector3(Math.cos(a)*r, height*(0.6+Math.random()*0.6), Math.sin(a)*r));
+  }
+  const geo = new THREE.ConeGeometry(6, height, 4, 1);
+  const inst = new THREE.InstancedMesh(geo, color, n);
+  const mm = new THREE.Matrix4();
+  for (let i = 0; i < n; i++) {
+    const p = pts[i];
+    mm.makeTranslation(p.x, p.y*0.5, p.z);
+    mm.multiply(new THREE.Matrix4().makeScale(0.9, p.y/height, 0.9));
+    mm.multiply(new THREE.Matrix4().makeRotationY(Math.random()*Math.PI));
+    inst.setMatrixAt(i, mm);
+  }
+  inst.instanceMatrix.needsUpdate = true;
+  inst.castShadow = true;
+  return inst;
+}
+scene.add(makeMountains(55, 18, mtFar, 1.2));
+scene.add(makeMountains(40, 12, mtNear, 3.7));
+
+/* =========================================================
+   Clouds
+   ========================================================= */
+const cloudGroup = new THREE.Group();
+const cloudMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1.0, transparent: true, opacity: 0.92 });
+const clouds = [];
+for (let i = 0; i < 7; i++) {
+  const c = new THREE.Group();
+  const blobs = 3 + Math.floor(Math.random()*3);
+  for (let j = 0; j < blobs; j++) {
+    const b = new THREE.Mesh(new THREE.SphereGeometry(1.5 + Math.random()*1.5, 12, 8), cloudMat);
+    b.position.set((Math.random()-0.5)*5, (Math.random()-0.5)*1.2, (Math.random()-0.5)*3);
+    b.scale.y = 0.6;
+    c.add(b);
+  }
+  c.position.set((Math.random()-0.5)*70, 18 + Math.random()*8, -20 - Math.random()*30);
+  c.userData.speed = 0.3 + Math.random()*0.6;
+  cloudGroup.add(c);
+  clouds.push(c);
+}
+scene.add(cloudGroup);
+
+/* =========================================================
+   Birds
+   ========================================================= */
+const birdGroup = new THREE.Group();
+const birdMat = new THREE.MeshBasicMaterial({ color: 0x2a3a4a });
+const birds = [];
+for (let i = 0; i < 5; i++) {
+  const b = new THREE.Group();
+  const wingL = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 0.35), birdMat);
+  const wingR = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 0.35), birdMat);
+  wingL.position.x = -0.5; wingR.position.x = 0.5;
+  b.add(wingL, wingR);
+  b.userData = { phase: Math.random()*Math.PI*2, speed: 2 + Math.random()*2,
+    y: 10 + Math.random()*6, offset: (Math.random()-0.5)*30 };
+  birdGroup.add(b);
+  birds.push(b);
+}
+scene.add(birdGroup);
+
+/* =========================================================
+   Fireflies
+   ========================================================= */
+const fireflyCount = 60;
+const fireflyGeo = new THREE.BufferGeometry();
+const fireflyPos = new Float32Array(fireflyCount*3);
+const fireflyPhase = new Float32Array(fireflyCount);
+for (let i = 0; i < fireflyCount; i++) {
+  fireflyPos[i*3]   = (Math.random()-0.5)*60;
+  fireflyPos[i*3+1] = 0.5 + Math.random()*3;
+  fireflyPos[i*3+2] = (Math.random()-0.5)*60;
+  fireflyPhase[i] = Math.random()*Math.PI*2;
+}
+fireflyGeo.setAttribute('position', new THREE.BufferAttribute(fireflyPos, 3));
+fireflyGeo.setAttribute('phase', new THREE.BufferAttribute(fireflyPhase, 1));
+const fireflyMat = new THREE.PointsMaterial({
+  color: 0xfff59e, size: 0.25, transparent: true, opacity: 0.9,
+  blending: THREE.AdditiveBlending, depthWrite: false
+});
+fireflyMat.onBeforeCompile = (shader) => {
+  shader.uniforms.uTime = { value: 0 };
+  shader.vertexShader = 'uniform float uTime;\n' + shader.vertexShader.replace(
+    '#include <begin_vertex>',
+    '#include <begin_vertex>\n transformed.y += sin(uTime*2.0 + phase)*0.3;'
+  ).replace('attribute vec3 position;', 'attribute vec3 position;\nattribute float phase;');
+  shader.fragmentShader = 'uniform float uTime;\n' + shader.fragmentShader.replace(
+    '#include <dithering_fragment>',
+    'gl_FragColor.rgb *= (0.5 + 0.5*sin(uTime*3.0 + phase));\n#include <dithering_fragment>'
+  );
+};
+fireflyMat.userData = shader => shader;
+const fireflies = new THREE.Points(fireflyGeo, fireflyMat);
+scene.add(fireflies);
+
+/* =========================================================
+   TORTOISE  (head faces +Z = travel direction)
+   ========================================================= */
+function buildTortoise() {
+  const t = new THREE.Group();
+  t.position.set(0, 0, 0);
+
+  // ---- Shell (squished sphere) ----
+  const shell = new THREE.Mesh(new THREE.SphereGeometry(1.1, 40, 28), shellMat);
+  shell.scale.set(1.0, 0.62, 1.2);
+  shell.position.y = 1.0;
+  shell.castShadow = true;
+  t.add(shell);
+
+  // ---- Scutes (raised bumps on shell surface) ----
+  const scuteGeo = new THREE.SphereGeometry(0.22, 12, 8);
+  const scutePositions = [
+    // rows along the length (z), two columns (x)
+    [-0.5, 1.15, 0.7], [0.5, 1.15, 0.7],
+    [-0.6, 1.05, 0.2], [0.6, 1.05, 0.2],
+    [-0.5, 1.10, -0.3], [0.5, 1.10, -0.3],
+    [-0.4, 1.15, -0.8], [0.4, 1.15, -0.8],
+    [0.0, 1.2, 0.4], [0.0, 1.2, -0.5],
+    [0.0, 1.22, 1.0], [0.0, 1.22, -1.0],
+  ];
+  const scutes = [];
+  for (const p of scutePositions) {
+    const s = new THREE.Mesh(scuteGeo, scuteMat);
+    s.position.set(p[0], p[1], p[2]);
+    s.scale.set(1, 0.7, 1.2);
+    s.castShadow = true;
+    t.add(s);
+    scutes.push(s);
+  }
+
+  // ---- Head (front = +Z) ----
+  const headGroup = new THREE.Group();
+  headGroup.position.set(0, 1.05, 1.15);
+
+  const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.38, 0.8, 12), skinMat);
+  neck.rotation.x = Math.PI/2 * 0.7;
+  neck.position.set(0, 0.05, 0.25);
+  neck.castShadow = true;
+  headGroup.add(neck);
+
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.42, 20, 16), skinMat);
+  head.scale.set(1, 0.85, 1.2);
+  head.position.set(0, 0.15, 0.75);
+  head.castShadow = true;
+  headGroup.add(head);
+
+  // Snout
+  const snout = new THREE.Mesh(new THREE.SphereGeometry(0.18, 12, 8), skinMat);
+  snout.position.set(0, 0.05, 1.1);
+  snout.scale.set(1, 0.7, 1);
+  headGroup.add(snout);
+
+  // Eyes (front-facing, on +Z side of head)
+  const eyeGeo = new THREE.SphereGeometry(0.1, 12, 8);
+  const pupilGeo = new THREE.SphereGeometry(0.055, 8, 6);
+  const eyeL = new THREE.Mesh(eyeGeo, eyeMat);
+  const eyeR = new THREE.Mesh(eyeGeo, eyeMat);
+  const pupL = new THREE.Mesh(pupilGeo, pupilMat);
+  const pupR = new THREE.Mesh(pupilGeo, pupilMat);
+  eyeL.position.set(-0.22, 0.28, 0.95);
+  eyeR.position.set( 0.22, 0.28, 0.95);
+  pupL.position.set(-0.22, 0.28, 1.0);
+  pupR.position.set( 0.22, 0.28, 1.0);
+  headGroup.add(eyeL, eyeR, pupL, pupR);
+
+  // Scales on head
+  const scaleGeo = new THREE.SphereGeometry(0.06, 6, 4);
+  for (let i = 0; i < 6; i++) {
+    const s = new THREE.Mesh(scaleGeo, scuteMat);
+    s.position.set((Math.random()-0.5)*0.5, 0.15+Math.random()*0.2, 0.5+Math.random()*0.4);
+    s.scale.set(1, 0.6, 1);
+    headGroup.add(s);
+  }
+
+  t.add(headGroup);
+
+  // ---- Tail (rear = -Z) ----
+  const tail = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.5, 8), skinMat);
+  tail.rotation.x = Math.PI/2;
+  tail.position.set(0, 0.95, -1.2);
+  tail.castShadow = true;
+  t.add(tail);
+
+  // ---- Legs ----
+  function makeLeg(x, z) {
+    const leg = new THREE.Group();
+    leg.position.set(x, 0.85, z);
+
+    const upper = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.28, 0.5, 8), skinMat);
+    upper.position.y = -0.2;
+    upper.castShadow = true;
+    leg.add(upper);
+
+    const lower = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.22, 0.4, 8), skinMat);
+    lower.position.y = -0.55;
+    lower.castShadow = true;
+    leg.add(lower);
+
+    const foot = new THREE.Mesh(new THREE.SphereGeometry(0.22, 10, 6), footMat);
+    foot.scale.set(1.2, 0.5, 1.5);
+    foot.position.set(0, -0.75, 0.1);
+    foot.castShadow = true;
+    leg.add(foot);
+
+    // Toes
+    for (let i = -1; i <= 1; i++) {
+      const toe = new THREE.Mesh(new THREE.SphereGeometry(0.06, 6, 4), footMat);
+      toe.position.set(i*0.08, -0.78, 0.28);
+      leg.add(toe);
+    }
+
+    t.add(leg);
+    return leg;
+  }
+
+  const legFL = makeLeg(-0.65,  0.7);   // front-left
+  const legFR = makeLeg( 0.65,  0.7);   // front-right
+  const legBL = makeLeg(-0.6,  -0.7);   // back-left
+  const legBR = makeLeg( 0.6,  -0.7);   // back-right
+
+  // Shadow blob (soft contact shadow)
+  const shadowBlob = new THREE.Mesh(
+    new THREE.CircleGeometry(1.3, 24),
+    new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.18 })
+  );
+  shadowBlob.rotation.x = -Math.PI/2;
+  shadowBlob.position.y = 0.02;
+  t.add(shadowBlob);
+
+  return { t, headGroup, tail, legFL, legFR, legBL, legBR };
+}
+
+const tortoise = buildTortoise();
+scene.add(tortoise.t);
+
+/* =========================================================
+   Animation
+   ========================================================= */
+const clock = new THREE.Clock();
+const SPEED = 1.2;          // units per second
+const STRIDE = 0.7;         // radians of leg swing
+const GAIT_FREQ = 2.0;      // Hz
+
+function animate() {
+  requestAnimationFrame(animate);
+  const t = clock.getElapsedTime();
+
+  // ---- Tortoise walks forward (+Z) ----
+  tortoise.t.position.z += SPEED * (1/60);
+  if (tortoise.t.position.z > 20) tortoise.t.position.z = -20; // loop
+
+  // Head bobs forward
+  const gait = t * GAIT_FREQ * Math.PI * 2;
+  tortoise.headGroup.position.z = 1.15 + Math.sin(gait) * 0.08;
+  tortoise.headGroup.position.y = 1.05 + Math.sin(gait * 2) * 0.03;
+
+  // Tail wags
+  tortoise.tail.rotation.y = Math.sin(gait * 0.5) * 0.3;
+
+  // Legs: diagonal pair gait
+  // FL & BR swing together; FR & BL swing together (opposite phase)
+  const swing = Math.sin(gait) * STRIDE;
+  tortoise.legFL.rotation.x =  swing;
+  tortoise.legBR.rotation.x =  swing;
+  tortoise.legFR.rotation.x = -swing;
+  tortoise.legBL.rotation.x = -swing;
+
+  // Slight body roll
+  tortoise.t.rotation.z = Math.sin(gait * 0.5) * 0.02;
+
+  // ---- Clouds drift ----
+  for (const c of clouds) {
+    c.position.x += c.userData.speed * (1/60);
+    if (c.position.x > 45) c.position.x = -45;
+  }
+
+  // ---- Birds fly + flap ----
+  for (const b of birds) {
+    b.position.x = -40 + ((t * b.userData.speed + b.userData.offset) % 80);
+    b.position.y = b.userData.y + Math.sin(t * 1.5 + b.userData.phase) * 0.5;
+    b.position.z = -15 + Math.sin(t * 0.3 + b.userData.phase) * 5;
+    const flap = Math.sin(t * 12 + b.userData.phase) * 0.6;
+    b.children[0].rotation.z =  flap;
+    b.children[1].rotation.z = -flap;
+  }
+
+  // ---- Fireflies pulse (update uniform) ----
+  if (fireflyMat.onBeforeCompile !== undefined) {
+    // access compiled shader uniforms via a stored reference
+  }
+  // Simpler: pulse via material opacity
+  fireflyMat.opacity = 0.6 + 0.3 * Math.sin(t * 2);
+
+  // ---- Camera follows tortoise softly ----
+  controls.target.z += (tortoise.t.position.z - controls.target.z) * 0.04;
+  controls.update();
+
+  renderer.render(scene, camera);
+}
+animate();
+
+/* =========================================================
+   Resize
+   ========================================================= */
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+</script>
+</body>
+</html>
