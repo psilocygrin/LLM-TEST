@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Old Shelly — a tortoise on the forest road</title>
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;font-family:'Trebuchet MS','Segoe UI',system-ui,sans-serif;background:
+       radial-gradient(120% 90% at 50% -10%, #dcefff 0%, #bfe0f6 45%, #9fcbe6 100%);
+       min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:18px}
+  h1{margin:0;font-weight:700;letter-spacing:.5px;font-size:clamp(18px,3vw,28px);color:#12466b}
+  h1 span{color:#2f7d4e}
+  .card{width:min(1200px,96vw);border-radius:20px;padding:14px;background:#fffefb;
+        box-shadow:0 24px 60px -20px rgba(20,60,90,.5),0 4px 14px rgba(20,60,90,.18)}
+  svg{display:block;width:100%;height:auto;border-radius:12px}
+  .foot{color:#2b567a;font-size:13px}
+
+  @keyframes walk{from{transform:translateX(-240px)}to{transform:translateX(1640px)}}
+  @keyframes bob{from{transform:translateY(0)}to{transform:translateY(-6px)}}
+  @keyframes swingA{from{transform:rotate(-20deg)}to{transform:rotate(18deg)}}
+  @keyframes swingB{from{transform:rotate(18deg)}to{transform:rotate(-20deg)}}
+  @keyframes headUp{0%,100%{transform:rotate(0)}50%{transform:rotate(-4deg)}}
+  @keyframes headDown{0%,100%{transform:rotate(0)}50%{transform:rotate(9deg)}}
+  @keyframes tailWag{from{transform:rotate(-7deg)}to{transform:rotate(9deg)}}
+  @keyframes cloudDrift{from{transform:translateX(-160px)}to{transform:translateX(1760px)}}
+  @keyframes sunPulse{from{transform:scale(1)}to{transform:scale(1.07)}}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  @keyframes sway{from{transform:rotate(-1.7deg)}to{transform:rotate(1.7deg)}}
+  @keyframes birdFly{0%{transform:translate(-150px,60px)}50%{transform:translate(850px,-40px)}100%{transform:translate(1750px,20px)}}
+  @keyframes flappy{0%,100%{transform:scaleY(1)}50%{transform:scaleY(.55)}}
+  @keyframes puff{0%{opacity:.45;transform:scale(.5) translate(0,0)}100%{opacity:0;transform:scale(1.5) translate(-18px,-16px)}}
+  @keyframes flutter{from{transform:translateX(0) translateY(0)}50%{transform:translateX(50px) translateY(-20px)}to{transform:translateX(0) translateY(0)}}
+  @keyframes wingflap{from{transform:scaleX(1)}to{transform:scaleX(.35)}}
+  @keyframes shimmer{0%,100%{opacity:.5;transform:translateY(0)}50%{opacity:.15;transform:translateY(-3px)}}
+
+  #scene{animation:walk 17s linear infinite}
+  .bob{animation:bob 1.6s ease-in-out infinite}
+  .fl-1{transform-box:fill-box;transform-origin:50% 100%;animation:swingA .8s ease-in-out infinite alternate}
+  .fl-2{transform-box:fill-box;transform-origin:50% 100%;animation:swingB .8s ease-in-out infinite alternate}
+  .fl-3{transform-box:fill-box;transform-origin:50% 100%;animation:swingB .8s ease-in-out infinite alternate}
+  .fl-4{transform-box:fill-box;transform-origin:50% 100%;animation:swingA .8s ease-in-out infinite alternate}
+  .head-up{transform-box:fill-box;transform-origin:12% 55%;animation:headUp 3.2s ease-in-out infinite}
+  .head-down{transform-box:fill-box;transform-origin:12% 55%;animation:headDown 3.6s ease-in-out infinite}
+  .tail{transform-box:fill-box;transform-origin:100% 50%;animation:tailWag .8s ease-in-out infinite alternate}
+  .cloud{animation:cloudDrift 60s linear infinite}
+  .sun-rays{transform-box:fill-box;transform-origin:50% 50%;animation:spin 40s linear infinite}
+  .sun-glow{transform-box:fill-box;transform-origin:50% 50%;animation:sunPulse 5s ease-in-out infinite alternate}
+  .tree-sway{transform-box:fill-box;transform-origin:50% 100%;animation:sway 5s ease-in-out infinite alternate}
+  .bird-fly{animation:birdFly 28s linear infinite}
+  .bird-flap{transform-box:fill-box;transform-origin:50% 50%;animation:flappy .5s ease-in-out infinite}
+  .dust{transform-box:fill-box;transform-origin:50% 50%;animation:puff .9s ease-out infinite}
+  .flutter{animation:flutter 5s ease-in-out infinite}
+  .wing-l{transform-box:fill-box;transform-origin:100% 50%;animation:wingflap .16s linear infinite alternate}
+  .wing-r{transform-box:fill-box;transform-origin:0 50%;animation:wingflap .16s linear infinite alternate}
+  .shimmer{animation:shimmer 2.4s ease-in-out infinite}
+
+  @media (prefers-reduced-motion:reduce){
+    #scene,.bob,.fl-1,.fl-2,.fl-3,.fl-4,.head-up,.head-down,.tail,.cloud,.sun-rays,
+    .sun-glow,.tree-sway,.bird-fly,.bird-flap,.dust,.flutter,.wing-l,.wing-r,.shimmer{animation:none}
+  }
+</style>
+</head>
+<body>
+  <h1>Old Shelly <span>crosses the forest road</span></h1>
+  <div class="card">
+    <svg viewBox="0 0 1600 600" role="img" aria-label="An animated side view of a tortoise walking along a country road toward the right, with rolling mountains, a bright sun, drifting clouds, and a pine forest behind it.">
+      <defs>
+        <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#a8d8f0"/><stop offset=".5" stop-color="#cfeaf8"/><stop offset="1" stop-color="#eaf6fc"/>
+        </linearGradient>
+        <radialGradient id="sunGlow" cx=".5" cy=".5" r=".5">
+          <stop offset="0" stop-color="#fff7d6" stop-opacity=".95"/><stop offset=".55" stop-color="#ffe58a" stop-opacity=".35"/><stop offset="1" stop-color="#ffe58a" stop-opacity="0"/>
+        </radialGradient>
+        <radialGradient id="sunCore" cx=".42" cy=".4" r=".75">
+          <stop offset="0" stop-color="#fffef6"/><stop offset="1" stop-color="#ffd65a"/>
+        </radialGradient>
+        <linearGradient id="mtnFar" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#bcd0e6"/><stop offset="1" stop-color="#8fb2d6"/>
+        </linearGradient>
+        <linearGradient id="mtnNear" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#7fa3c9"/><stop offset="1" stop-color="#567ea6"/>
+        </linearGradient>
+        <linearGradient id="hills" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#8fbf6f"/><stop offset="1" stop-color="#5f9c48"/>
+        </linearGradient>
+        <linearGradient id="field" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#b9df85"/><stop offset="1" stop-color="#7cbf54"/>
+        </linearGradient>
+        <linearGradient id="road" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#8a95a2"/><stop offset="1" stop-color="#6b7684"/>
+        </linearGradient>
+        <radialGradient id="shell" cx=".38" cy=".28" r=".85">
+          <stop offset="0" stop-color="#93b865"/><stop offset=".45" stop-color="#6e9b47"/><stop offset="1" stop-color="#3d612b"/>
+        </radialGradient>
+        <radialGradient id="scute" cx=".4" cy=".32" r=".8">
+          <stop offset="0" stop-color="#7fa854"/><stop offset="1" stop-color="#4a6f33"/>
+        </radialGradient>
+        <linearGradient id="plastron" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#e7d39f"/><stop offset="1" stop-color="#c3a268"/>
+        </linearGradient>
+        <linearGradient id="leg" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#9aa24c"/><stop offset="1" stop-color="#6b7436"/>
+        </linearGradient>
+        <linearGradient id="headg" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#92a24a"/><stop offset="1" stop-color="#6b7a37"/>
+        </linearGradient>
+        <radialGradient id="eyeG" cx=".4" cy=".35" r=".75">
+          <stop offset="0" stop-color="#7f6538"/><stop offset="1" stop-color="#2a1d10"/>
+        </radialGradient>
+      </defs>
+
+      <!-- ===== SKY ===== -->
+      <rect x="0" y="0" width="1600" height="600" fill="url(#sky)"/>
+
+      <!-- ===== SUN ===== -->
+      <circle class="sun-glow" cx="1300" cy="150" r="220" fill="url(#sunGlow)"/>
+      <g class="sun-rays">
+        <g stroke="#ffe58a" stroke-width="8" stroke-linecap="round" opacity=".5">
+          <line x1="1222" y1="150" x2="1378" y2="150"/><line x1="1300" y1="72" x2="1300" y2="228"/>
+          <line x1="1245" y1="95" x2="1355" y2="205"/><line x1="1355" y1="95" x2="1245" y2="205"/>
+        </g>
+      </g>
+      <circle cx="1300" cy="150" r="66" fill="url(#sunCore)"/>
+
+      <!-- ===== CLOUDS ===== -->
+      <g class="cloud" style="animation-delay:-8s">
+        <g fill="#fff" opacity=".95">
+          <ellipse cx="220" cy="150" rx="55" ry="30"/><ellipse cx="275" cy="140" rx="45" ry="34"/>
+          <ellipse cx="165" cy="160" rx="40" ry="26"/><ellipse cx="250" cy="165" rx="60" ry="24"/>
+        </g>
+      </g>
+      <g class="cloud" style="animation-delay:-30s">
+        <g fill="#fff" opacity=".9" transform="translate(720,110) scale(.85)">
+          <ellipse cx="0" cy="0" rx="55" ry="30"/><ellipse cx="55" cy="-10" rx="45" ry="34"/>
+          <ellipse cx="-55" cy="10" rx="40" ry="26"/><ellipse cx="30" cy="15" rx="60" ry="24"/>
+        </g>
+      </g>
+      <g class="cloud" style="animation-delay:-48s">
+        <g fill="#fff" opacity=".92" transform="translate(440,185) scale(.7)">
+          <ellipse cx="0" cy="0" rx="55" ry="30"/><ellipse cx="50" cy="-8" rx="45" ry="32"/>
+          <ellipse cx="-48" cy="8" rx="40" ry="24"/><ellipse cx="25" cy="12" rx="55" ry="22"/>
+        </g>
+      </g>
+
+      <!-- ===== BIRDS ===== -->
+      <g class="bird-fly" style="animation-delay:-4s">
+        <g class="bird-flap">
+          <path d="M0 0 Q9 -8 18 0 Q9 7 0 0 Q-9 -8 -18 0 Q-9 7 0 0Z" fill="#33465c"/>
+        </g>
+      </g>
+      <g class="bird-fly" style="animation-delay:-16s;animation-duration:34s">
+        <g class="bird-flap" style="animation-delay:-.2s">
+          <path d="M0 0 Q8 -7 16 0 Q8 6 0 0 Q-8 -7 -16 0 Q-8 6 0 0Z" fill="#2b3d52"/>
+        </g>
+      </g>
+
+      <!-- ===== MOUNTAINS ===== -->
+      <path d="M-50 420 L180 300 L340 388 L560 250 L820 392 L1040 300 L1250 388 L1450 330 L1700 400 L1700 460 L-50 460 Z" fill="url(#mtnFar)"/>
+      <path d="M150 330 L180 300 L212 334 L198 322 L186 336 L172 322 Z" fill="#eef4fb"/>
+      <path d="M528 286 L560 250 L596 292 L578 278 L562 296 L548 276 Z" fill="#eef4fb"/>
+      <path d="M1418 360 L1450 330 L1486 368 L1468 354 L1452 370 L1438 354 Z" fill="#eef4fb"/>
+      <path d="M-50 452 L120 384 L300 436 L470 360 L640 432 L820 372 L1000 440 L1180 380 L1360 436 L1540 392 L1700 448 L1700 470 L-50 470 Z" fill="url(#mtnNear)"/>
+
+      <!-- ===== HILLS + FOREST ===== -->
+      <path d="M-50 450 Q300 420 600 440 Q900 458 1200 436 Q1450 420 1700 448 L1700 472 L-50 472 Z" fill="url(#hills)"/>
+
+      <g fill="#2f5a2c">
+        <polygon points="60,472 10,472 35,430"/><polygon points="60,472 14,472 37,438"/>
+      </g>
+      <g fill="#3d7342">
+        <polygon points="60,470 8,470 34,420"/><polygon points="60,470 12,470 36,430"/><polygon points="60,470 16,470 38,440"/>
+      </g>
+
+      <!-- mid pines (some gently sway) -->
+      <g>
+        <rect x="188" y="404" width="6" height="66" fill="#5b4630"/>
+        <polygon points="191,300 159,360 223,360" fill="#274a29"/><polygon points="191,336 162,392 220,392" fill="#2f5a2c"/>
+        <polygon points="191,366 168,418 214,418" fill="#356233"/>
+      </g>
+      <g class="tree-sway" style="animation-delay:-1s">
+        <rect x="318" y="412" width="6" height="58" fill="#5b4630"/>
+        <polygon points="321,318 291,372 351,372" fill="#274a29"/><polygon points="321,350 294,400 348,400" fill="#2f5a2c"/>
+        <polygon points="321,378 298,424 344,424" fill="#356233"/>
+      </g>
+      <g>
+        <rect x="472" y="404" width="6" height="66" fill="#5b4630"/>
+        <polygon points="475,300 443,360 507,360" fill="#274a29"/><polygon points="475,336 446,392 504,392" fill="#2f5a2c"/>
+        <polygon points="475,366 450,418 500,418" fill="#356233"/>
+      </g>
+      <g class="tree-sway" style="animation-delay:-2.4s">
+        <rect x="948" y="408" width="6" height="62" fill="#5b4630"/>
+        <polygon points="951,308 919,366 983,366" fill="#274a29"/><polygon points="951,342 922,396 980,396" fill="#2f5a2c"/>
+        <polygon points="951,370 926,420 976,420" fill="#356233"/>
+      </g>
+      <g>
+        <rect x="1128" y="404" width="6" height="66" fill="#5b4630"/>
+        <polygon points="1131,300 1099,360 1163,360" fill="#274a29"/><polygon points="1131,336 1102,392 1160,392" fill="#2f5a2c"/>
+        <polygon points="1131,366 1106,418 1156,418" fill="#356233"/>
+      </g>
+      <g class="tree-sway" style="animation-delay:-3.3s">
+        <rect x="1378" y="412" width="6" height="58" fill="#5b4630"/>
+        <polygon points="1381,318 1351,372 1411,372" fill="#274a29"/><polygon points="1381,350 1354,400 1408,400" fill="#2f5a2c"/>
+        <polygon points="1381,378 1358,424 1404,424" fill="#356233"/>
+      </g>
+      <g class="tree-sway" style="animation-delay:-4s">
+        <rect x="1530" y="410" width="6" height="60" fill="#5b4630"/>
+        <polygon points="1533,314 1503,368 1563,368" fill="#274a29"/><polygon points="1533,348 1506,400 1560,400" fill="#2f5a2c"/>
+        <polygon points="1533,376 1510,422 1556,422" fill="#356233"/>
+      </g>
+
+      <!-- ===== FIELD + FLOWERS ===== -->
+      <path d="M-50 458 L1700 458 L1700 470 L-50 470 Z" fill="url(#field)"/>
+      <g>
+        <circle cx="150" cy="466" r="3" fill="#f7d24a"/><circle cx="164" cy="464" r="3" fill="#f4f6fb"/>
+        <circle cx="100" cy="468" r="3" fill="#f08fb0"/><circle cx="360" cy="466" r="3" fill="#f7d24a"/>
+        <circle cx="560" cy="468" r="3" fill="#f4f6fb"/><circle cx="700" cy="466" r="3" fill="#f08fb0"/>
+        <circle cx="980" cy="468" r="3" fill="#f7d24a"/><circle cx="1180" cy="466" r="3" fill="#f4f6fb"/>
+        <circle cx="1360" cy="468" r="3" fill="#f08fb0"/><circle cx="1500" cy="466" r="3" fill="#f7d24a"/>
+      </g>
+
+      <!-- ===== ROAD ===== -->
+      <rect x="0" y="468" width="1600" height="132" fill="url(#road)"/>
+      <line x1="0" y1="472" x2="1600" y2="472" stroke="#cfd6df" stroke-width="4"/>
+      <line x1="0" y1="592" x2="1600" y2="592" stroke="#4c5563" stroke-width="6"/>
+      <g fill="#f3f5f8" opacity=".85">
+        <rect x="40" y="531" width="70" height="7" rx="3"/><rect x="240" y="531" width="70" height="7" rx="3"/>
+        <rect x="440" y="531" width="70" height="7" rx="3"/><rect x="640" y="531" width="70" height="7" rx="3"/>
+        <rect x="840" y="531" width="70" height="7" rx="3"/><rect x="1040" y="531" width="70" height="7" rx="3"/>
+        <rect x="1240" y="531" width="70" height="7" rx="3"/><rect x="1440" y="531" width="70" height="7" rx="3"/>
+      </g>
+      <g fill="#727d8b" opacity=".5">
+        <circle cx="150" cy="500" r="2"/><circle cx="300" cy="556" r="2"/><circle cx="430" cy="505" r="2"/>
+        <circle cx="580" cy="565" r="2"/><circle cx="740" cy="502" r="2"/><circle cx="900" cy="558" r="2"/>
+        <circle cx="1080" cy="506" r="2"/><circle cx="1240" cy="560" r="2"/><circle cx="1400" cy="504" r="2"/>
+      </g>
+
+      <!-- ===== BUTTERFLY ===== -->
+      <g class="flutter" style="animation-delay:-1s">
+        <g class="wing-r"><path d="M2 0 C2 -20 26 -26 30 -8 C28 4 8 6 2 0 Z" fill="#f0a832" opacity=".92"/></g>
+        <g class="wing-l"><path d="M-2 0 C-2 -20 -26 -26 -30 -8 C-28 4 -8 6 -2 0 Z" fill="#e88f2a" opacity=".92"/></g>
+        <ellipse cx="0" cy="-2" rx="3.5" ry="9" fill="#3a2a1a"/>
+        <path d="M-1 -10 Q-6 -18 -10 -20 M1 -10 Q6 -18 10 -20" stroke="#3a2a1a" stroke-width="1.4" fill="none" stroke-linecap="round"/>
+      </g>
+
+      <!-- ===== HEAT SHIMMER ===== -->
+      <rect class="shimmer" x="1180" y="420" width="300" height="46" fill="url(#sunGlow)"/>
+
+      <!-- ================= TORTOISE ================= -->
+      <g id="scene">
+        <!-- contact shadow (stays on the ground while the body bobs) -->
+        <ellipse cx="508" cy="472" rx="228" ry="20" fill="#1a2a10" opacity=".18"/>
+
+        <g class="bob">
+          <!-- far hind leg -->
+          <path class="fl-4" d="M668 414 C692 424 704 444 706 460 C707 469 700 474 690 474 C676 474 670 466 666 452 C660 432 660 420 668 414 Z" fill="#66703a"/>
+          <path class="fl-4" d="M678 468 C688 469 696 470 701 473 L666 475 C668 471 672 468 678 468 Z" fill="#4c5429"/>
+
+          <!-- tail -->
+          <path class="tail" d="M682 402 C702 405 720 410 736 418 C720 425 702 426 686 420 C680 413 679 407 682 402 Z" fill="url(#leg)"/>
+
+          <!-- near hind leg -->
+          <path class="fl-2" d="M652 410 C682 422 700 442 704 460 C706 470 696 475 682 475 C668 475 660 466 655 450 C648 430 648 418 652 410 Z" fill="url(#leg)"/>
+          <path class="fl-2" d="M664 468 C674 468 686 469 692 472 L654 475 C657 471 660 468 664 468 Z" fill="#5b6231"/>
+          <g class="fl-2" fill="#8a9250"><circle cx="676" cy="470" r="2.5"/><circle cx="686" cy="470" r="2.5"/><circle cx="694" cy="470" r="2.5"/></g>
+
+          <!-- plastron (under the belly) -->
+          <path d="M300 400 C360 430 450 444 520 438 C580 433 650 424 674 410 C648 420 560 426 470 418 C384 410 320 405 300 400 Z" fill="url(#plastron)"/>
+          <path d="M340 408 C400 420 470 424 540 420 C600 416 640 410 668 402" fill="none" stroke="#8a6f3f" stroke-width="1.4" opacity=".5"/>
+
+          <!-- carapace (domed) -->
+          <path d="M282 414 C286 350 350 306 452 300 C548 296 626 308 672 346 C700 368 716 392 704 402 C660 414 540 422 430 418 C360 415 306 414 282 414 Z" fill="url(#shell)"/>
+          <path d="M300 360 C360 322 450 314 520 318 C560 320 596 328 620 344 C588 336 520 330 452 334 C384 338 322 350 300 360 Z" fill="#dfe9c4" opacity=".3"/>
+          <path d="M604 340 C648 350 684 376 700 398 C708 406 704 410 694 408 C676 388 648 364 610 350 Z" fill="#e7efcf" opacity=".45"/>
+          <!-- scutes -->
+          <g stroke="#2c471f" stroke-width="2" fill="url(#scute)">
+            <polygon points="382,380 380,342 424,326 470,344 472,380"/><polygon points="472,344 470,300 516,296 558,306 558,344"/>
+            <polygon points="356,414 354,380 382,380 380,414"/><polygon points="424,380 424,326 470,344 472,380"/>
+            <polygon points="558,344 558,306 596,312 620,332 586,362"/><polygon points="472,380 470,344 518,348 560,360 558,386"/>
+            <polygon points="620,332 640,350 648,378 620,382 586,362"/><polygon points="558,386 560,360 598,364 620,382 616,398"/>
+          </g>
+          <ellipse cx="408" cy="352" rx="60" ry="22" fill="#ffffff" opacity=".12"/>
+
+          <!-- dust puffs -->
+          <circle class="dust" cx="690" cy="470" r="8" fill="#c9c2ae" style="animation-delay:0s"/>
+          <circle class="dust" cx="690" cy="470" r="8" fill="#c9c2ae" style="animation-delay:-.45s"/>
+          <circle class="dust" cx="352" cy="470" r="7" fill="#c9c2ae" style="animation-delay:-.2s"/>
+
+          <!-- near foreleg -->
+          <path class="fl-1" d="M362 406 C338 418 322 440 320 460 C319 470 328 475 340 475 C354 475 362 466 364 450 C367 430 368 416 362 406 Z" fill="url(#leg)"/>
+          <path class="fl-1" d="M330 468 C340 467 350 468 356 471 L320 474 C322 470 325 468 330 468 Z" fill="#5b6231"/>
+          <g class="fl-1" fill="#8a9250"><circle cx="330" cy="470" r="2.5"/><circle cx="340" cy="470" r="2.5"/><circle cx="349" cy="470" r="2.5"/></g>
+
+          <!-- head + neck (front-facing, toward the right) -->
+          <g class="head-up">
+            <path d="M300 372 C282 368 262 364 246 360 C238 359 232 360 228 364 C224 368 222 376 224 384 C226 390 230 394 236 395 C240 402 246 412 256 420 C270 416 286 410 300 404 C306 392 306 380 300 372 Z" fill="url(#headg)"/>
+            <ellipse cx="252" cy="382" rx="6" ry="4" fill="#b9c46e" opacity=".55"/>
+            <!-- back-facing (near) eye -->
+            <circle cx="250" cy="378" r="7.5" fill="url(#eyeG)"/>
+            <circle cx="252" cy="376" r="2" fill="#f4f4ee" opacity=".8"/>
+            <!-- front-facing (far) eye peeking over -->
+            <circle cx="238" cy="376" r="3.4" fill="#3a2c16"/>
+            <circle cx="239" cy="375" r="1.1" fill="#eaeaea" opacity=".8"/>
+            <circle cx="226" cy="373" r="1.8" fill="#4a4030"/>
+            <path d="M226 384 Q232 388 238 388" fill="none" stroke="#5b522f" stroke-width="1.4" opacity=".6"/>
+            <path d="M246 400 Q252 410 258 414" fill="none" stroke="#5b6231" stroke-width="1.2" opacity=".5"/>
+          </g>
+        </g>
+      </g>
+    </svg>
+  </div>
+  <p class="foot">Pure HTML + CSS + SVG · no JavaScript · respects reduced-motion.</p>
+</body>
+</html>
